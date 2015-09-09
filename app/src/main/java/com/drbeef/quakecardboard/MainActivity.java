@@ -7,8 +7,10 @@ import com.google.vrtoolkit.cardboard.Eye;
 import com.google.vrtoolkit.cardboard.HeadTransform;
 import com.google.vrtoolkit.cardboard.Viewport;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.graphics.PixelFormat;
 import android.opengl.GLES20;
 import android.os.Bundle;
 import android.os.Vibrator;
@@ -30,7 +32,10 @@ import java.io.OutputStream;
 import javax.microedition.khronos.egl.EGLConfig;
 
 
-public class MainActivity extends CardboardActivity implements CardboardView.StereoRenderer {
+public class MainActivity
+        extends CardboardActivity
+        implements CardboardView.StereoRenderer
+{
 
     private static final String TAG = "QuakeCardboard";
 
@@ -123,14 +128,17 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
 
     }
 
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
         CardboardView cardboardView = (CardboardView) findViewById(R.id.cardboard_view);
-        cardboardView.setEGLConfigChooser(new QuakeEGLConfigChooser());
-        //cardboardView.setRestoreGLStateEnabled(true);
+        cardboardView.setEGLConfigChooser(new QuakeEGLConfigChooser( ));
+        cardboardView.getHolder().setFormat(PixelFormat.RGBA_8888);
+        cardboardView.setEGLContextClientVersion(2);
+
         cardboardView.setRenderer(this);
         setCardboardView(cardboardView);
 
@@ -188,7 +196,9 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
      @Override
     public void onSurfaceCreated(EGLConfig config)
      {
+
          Log.i(TAG, "onSurfaceCreated");
+
      }
 
     /**

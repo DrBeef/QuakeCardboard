@@ -170,14 +170,14 @@ void GLES_Init(void)
 	if (!gl_platformextensions)
 		gl_platformextensions = "";
 
-	Con_DPrintf("GL_VENDOR: %s\n", gl_vendor);
-	Con_DPrintf("GL_RENDERER: %s\n", gl_renderer);
-	Con_DPrintf("GL_VERSION: %s\n", gl_version);
-	Con_DPrintf("GL_EXTENSIONS: %s\n", gl_extensions);
-	Con_DPrintf("%s_EXTENSIONS: %s\n", gl_platform, gl_platformextensions);
+	Con_Printf("GL_VENDOR: %s\n", gl_vendor);
+	Con_Printf("GL_RENDERER: %s\n", gl_renderer);
+	Con_Printf("GL_VERSION: %s\n", gl_version);
+	Con_Printf("GL_EXTENSIONS: %s\n", gl_extensions);
+	Con_Printf("%s_EXTENSIONS: %s\n", gl_platform, gl_platformextensions);
 	
 	// LordHavoc: report supported extensions
-	Con_DPrintf("\nQuakeC extensions for server and client: %s\nQuakeC extensions for menu: %s\n", vm_sv_extensions, vm_m_extensions );
+	Con_Printf("\nQuakeC extensions for server and client: %s\nQuakeC extensions for menu: %s\n", vm_sv_extensions, vm_m_extensions );
 
 	// GLES devices in general do not like GL_BGRA, so use GL_RGBA
 	vid.forcetextype = TEXTYPE_RGBA;
@@ -201,14 +201,6 @@ void GLES_Init(void)
 	vid.support.ext_blend_subtract = true;
 	vid.support.ext_draw_range_elements = true;
 	vid.support.ext_framebuffer_object = false;
-
-	// FIXME remove this workaround once FBO + npot texture mapping is fixed
-	if(!vid.support.arb_texture_non_power_of_two)
-	{
-		vid.support.arb_framebuffer_object = false;
-		vid.support.ext_framebuffer_object = false;
-	}
-
 	vid.support.ext_packed_depth_stencil = false;
 	vid.support.ext_stencil_two_side = false;
 	vid.support.ext_texture_3d = SDL_GL_ExtensionSupported("GL_OES_texture_3D");
