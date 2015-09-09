@@ -129,8 +129,8 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
 
         setContentView(R.layout.activity_main);
         CardboardView cardboardView = (CardboardView) findViewById(R.id.cardboard_view);
-        cardboardView.setEGLConfigChooser(8, 8, 8, 8, 24, 0);
-        cardboardView.setRestoreGLStateEnabled(true);
+        cardboardView.setEGLConfigChooser(new QuakeEGLConfigChooser());
+        //cardboardView.setRestoreGLStateEnabled(true);
         cardboardView.setRenderer(this);
         setCardboardView(cardboardView);
 
