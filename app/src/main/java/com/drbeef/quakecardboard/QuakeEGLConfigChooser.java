@@ -25,8 +25,8 @@ class QuakeEGLConfigChooser implements GLSurfaceView.EGLConfigChooser {
                 EGL10.EGL_GREEN_SIZE, 8,
                 EGL10.EGL_BLUE_SIZE, 8,
                 EGL10.EGL_ALPHA_SIZE, 8,
-                EGL10.EGL_DEPTH_SIZE, 0,
-                EGL10.EGL_STENCIL_SIZE, 0,
+                EGL10.EGL_DEPTH_SIZE, 24,
+                EGL10.EGL_STENCIL_SIZE, 8,
                 EGL10.EGL_NONE };
 
         int[] num_config = new int[1];
@@ -109,9 +109,11 @@ class QuakeEGLConfigChooser implements GLSurfaceView.EGLConfigChooser {
                 EGL10.EGL_DEPTH_SIZE, 0);
         int s = findConfigAttrib(egl, display, config,
                 EGL10.EGL_STENCIL_SIZE, 0);
+        int n = findConfigAttrib(egl, display, config,
+                EGL10.EGL_NATIVE_RENDERABLE, 0);
 
-        return String.format("EGLConfig msaa=%d rgba=%d%d%d%d depth=%d stencil=%d",
-                msaa, r, g, b, a, d, s)
+        return String.format("EGLConfig msaa=%d rgba=%d%d%d%d depth=%d stencil=%d native=%d",
+                msaa, r, g, b, a, d, s, n)
                 + " buffer="
                 + findConfigAttrib(egl, display, config,
                 EGL10.EGL_BUFFER_SIZE, 0)

@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 
 #include <signal.h>
-#include <EGL/egl.h>
+//#include <EGL/egl.h>
 #include <stdbool.h>
 
 int cl_available = true;
@@ -135,7 +135,7 @@ void VID_SetMouse (qboolean fullscreengrab, qboolean relative, qboolean hidecurs
 bool scndswp=0;
 void VID_Finish (void)
 {
-if (scndswp) eglSwapBuffers(eglGetCurrentDisplay(), eglGetCurrentSurface(EGL_DRAW));
+//if (scndswp) eglSwapBuffers(eglGetCurrentDisplay(), eglGetCurrentSurface(EGL_DRAW));
 scndswp=1;
 }
 
@@ -445,9 +445,9 @@ void QC_BeginFrame()
 	scndswp=0;
 	if (r_glsl_permutation!=0)
 	{
-	glUseProgram(r_glsl_permutation->program);
-	R_Mesh_TexBind(r_glsl_permutation->tex_Texture_First,0);
-	android_kostyl();//from Ð¯USSIAÐ˜ "ÐšÐ¾Ñ�Ñ‚Ñ‹Ð»ÑŒ" - "A dirty hack"
+//	glUseProgram(r_glsl_permutation->program);
+//	R_Mesh_TexBind(r_glsl_permutation->tex_Texture_First,0);
+//	android_kostyl();//from Ð¯USSIAÐ˜ "ÐšÐ¾Ñ�Ñ‚Ñ‹Ð»ÑŒ" - "A dirty hack"
 	}
 	Host_BeginFrame();
 }
@@ -541,9 +541,5 @@ void QC_SetResolution(int width, int height)
 {
 	andrw=width;
 	andrh=height;
-}
-
-void QC_OGLRestart()
-{
-VID_Restart_f();
+	//VID_Restart_f();
 }

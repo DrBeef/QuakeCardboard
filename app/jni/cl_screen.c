@@ -2747,8 +2747,8 @@ void CL_EndUpdateScreen()
 {
 	SCR_CaptureVideo();
 
-	if (qglFlush)
-		qglFlush(); // FIXME: should we really be using qglFlush here?
+//	if (qglFlush)
+//		qglFlush(); // FIXME: should we really be using qglFlush here?
 
 	if (!vid_activewindow)
 		VID_SetMouse(false, false, false);

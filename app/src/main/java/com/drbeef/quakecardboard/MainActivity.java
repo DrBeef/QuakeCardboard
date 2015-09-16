@@ -1,23 +1,34 @@
 package com.drbeef.quakecardboard;
 
-
-import com.google.vrtoolkit.cardboard.CardboardActivity;
-import com.google.vrtoolkit.cardboard.CardboardView;
-import com.google.vrtoolkit.cardboard.Eye;
-import com.google.vrtoolkit.cardboard.HeadTransform;
-import com.google.vrtoolkit.cardboard.Viewport;
-
 import android.app.Activity;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.content.res.AssetManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.PixelFormat;
+import android.opengl.GLES10;
+import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
+import android.opengl.GLSurfaceView;
+import android.opengl.GLUtils;
+import android.opengl.Matrix;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Vibrator;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.InputDevice;
+import android.view.Window;
+import android.view.WindowManager;
+
+import com.google.vrtoolkit.cardboard.CardboardActivity;
+import com.google.vrtoolkit.cardboard.CardboardView;
+import com.google.vrtoolkit.cardboard.Eye;
+import com.google.vrtoolkit.cardboard.HeadTransform;
+import com.google.vrtoolkit.cardboard.ScreenParams;
+import com.google.vrtoolkit.cardboard.Viewport;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -28,22 +39,85 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+import java.nio.ShortBuffer;
 
 import javax.microedition.khronos.egl.EGLConfig;
+import javax.microedition.khronos.opengles.GL10;
 
 
 public class MainActivity
         extends CardboardActivity
-        implements CardboardView.StereoRenderer
+//            extends Activity
+        implements CardboardView.Renderer
+//            implements GLSurfaceView.Renderer
 {
+    int[] texturenames = new int[1];
 
     private static final String TAG = "QuakeCardboard";
+
+    private static final int GL_RGBA8 = 0x8058;
+
+    private int[] currentFBO = new int[1];
+    int fboResolution = 0;
 
     private Vibrator vibrator;
     private float M_PI = 3.14159265358979323846f;
     public static AudioCallback mAudio;
     //Read these from a file and pass through
     String commandLineParams = new String("quake");
+
+    public static final String vs_Image =
+            "uniform mat4 uMVPMatrix;" +
+            "attribute vec4 vPosition;" +
+            "attribute vec2 a_texCoord;" +
+            "varying vec2 v_texCoord;" +
+            "void main() {" +
+            "  gl_Position = uMVPMatrix * vPosition;" +
+            "  v_texCoord = a_texCoord;" +
+            "}";
+
+    public static final String fs_Image =
+            "precision mediump float;" +
+                    "varying vec2 v_texCoord;" +
+                    "uniform sampler2D s_texture;" +
+                    "void main() {" +
+                    "  gl_FragColor = texture2D( s_texture, v_texCoord );" +
+                    "}";
+
+
+    public static int loadShader(int type, String shaderCode){
+        int shader = GLES20.glCreateShader(type);
+        GLES20.glShaderSource(shader, shaderCode);
+        GLES20.glCompileShader(shader);
+        return shader;
+    }
+
+    //FBO render eye buffer
+    private QuakeFBO fbo;
+
+    //Keep the dimensions
+    int mWidth = 0;
+    int mHeight = 0;
+
+    private int mPositionHandle;
+    private int mTexCoordLoc;
+
+    // Our matrices
+    private final float[] mtrxProjection = new float[16];
+    private final float[] mtrxView = new float[16];
+    private final float[] mtrxProjectionAndView = new float[16];
+
+    // Geometric variables
+    public static float vertices[];
+    public static short indices[];
+    public static float uvs[];
+    public FloatBuffer vertexBuffer;
+    public ShortBuffer drawListBuffer;
+    public FloatBuffer uvBuffer;
+    public static int sp_Image;
 
     public static boolean mQuakeInitialised = false;
 
@@ -89,7 +163,7 @@ public class MainActivity
 
     public static void copy_stream(InputStream in, OutputStream out)
             throws IOException {
-        byte[] buf = new byte[1024];
+        byte[] buf = new byte[512];
         while (true) {
             int count = in.read(buf);
             if (count <= 0)
@@ -129,20 +203,79 @@ public class MainActivity
     }
 
 
+    static boolean CreateFBO( QuakeFBO fbo, int offset, int width, int height)
+    {
+        Log.d(TAG, "CreateFBO");
+        // Create the color buffer texture.
+        GLES20.glGenTextures(1, fbo.ColorTexture, 0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fbo.ColorTexture[0]);
+        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+
+        // Create depth buffer.
+        GLES20.glGenRenderbuffers(1, fbo.DepthBuffer, 0);
+        GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, fbo.DepthBuffer[0]);
+        GLES20.glRenderbufferStorage(GLES20.GL_RENDERBUFFER, GLES11Ext.GL_DEPTH_COMPONENT24_OES, width, height);
+        GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, 0);
+
+        // Create the frame buffer.
+        GLES20.glGenFramebuffers(1, fbo.FrameBuffer, 0);
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
+        GLES20.glFramebufferRenderbuffer(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT, GLES20.GL_RENDERBUFFER, fbo.DepthBuffer[0]);
+        GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0, GLES20.GL_TEXTURE_2D, fbo.ColorTexture[0], 0);
+        int renderFramebufferStatus = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER);
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+        if ( renderFramebufferStatus != GLES20.GL_FRAMEBUFFER_COMPLETE )
+        {
+            Log.d(TAG, "Incomplete frame buffer object!!");
+            return false;
+        }
+
+        fbo.width = width;
+        fbo.height = height;
+
+        return true;
+    }
+
+    static void DestroyFBO( QuakeFBO fbo )
+    {
+        GLES20.glDeleteFramebuffers( 1, fbo.FrameBuffer, 0 );
+        fbo.FrameBuffer[0] = 0;
+        GLES20.glDeleteRenderbuffers( 1, fbo.DepthBuffer, 0 );
+        fbo.DepthBuffer[0] = 0;
+        GLES20.glDeleteTextures( 1, fbo.ColorTexture, 0 );
+        fbo.ColorTexture[0] = 0;
+        fbo.width = 0;
+        fbo.height = 0;
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        if (Build.VERSION.SDK_INT>=9)
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
         CardboardView cardboardView = (CardboardView) findViewById(R.id.cardboard_view);
-        cardboardView.setEGLConfigChooser(new QuakeEGLConfigChooser( ));
-        cardboardView.getHolder().setFormat(PixelFormat.RGBA_8888);
-        cardboardView.setEGLContextClientVersion(2);
+        cardboardView.setEGLConfigChooser(new QuakeEGLConfigChooser());
+        //cardboardView.getHolder().setFormat(PixelFormat.RGBA_8888);
+        cardboardView.setEGLContextClientVersion(3);
+        cardboardView.setEGLContextFactory(new QuakeEGLContextFactory());
 
         cardboardView.setRenderer(this);
         setCardboardView(cardboardView);
 
-        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
         //At the very least ensure we have a directory containing a config file
         copy_asset("config.cfg");
@@ -150,6 +283,8 @@ public class MainActivity
         //Not currently distributing the shareware version
         //copy_asset("pak0.pak");
 
+        //Create the FBOs
+        fbo = new QuakeFBO();
 
         if (mAudio==null)
         {
@@ -191,23 +326,55 @@ public class MainActivity
     public void onSurfaceChanged(int width, int height)
     {
         Log.d(TAG, "onSurfaceChanged width = " + width + "  height = " + height);
+
+        mWidth = width;
+        mHeight = height;
+
     }
 
-     @Override
-    public void onSurfaceCreated(EGLConfig config)
-     {
-
+    @Override
+    public void onSurfaceCreated(EGLConfig config) {
          Log.i(TAG, "onSurfaceCreated");
 
+         // Create the shaders, images
+         int vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vs_Image);
+         int fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fs_Image);
+
+         sp_Image = GLES20.glCreateProgram();             // create empty OpenGL ES Program
+         GLES20.glAttachShader(sp_Image, vertexShader);   // add the vertex shader to program
+         GLES20.glAttachShader(sp_Image, fragmentShader); // add the fragment shader to program
+         GLES20.glLinkProgram(sp_Image);                  // creates OpenGL ES program executable
      }
 
-    /**
-     * Prepares OpenGL ES before we draw a frame.
-     *
-     * @param headTransform The head transformation in the new frame.
-     */
+    int getDesiredFBOResolution(int viewportWidth) {
+
+        if (viewportWidth > 1024)
+            return 1024;
+        if (viewportWidth > 512)
+            return 512;
+        if (viewportWidth > 256)
+            return 256;
+
+        //don't want to go lower than this
+        return 128;
+    }
+
     @Override
-    public void onNewFrame(HeadTransform headTransform) {
+    public void onDrawFrame(HeadTransform headTransform, Eye lefteye, Eye righteye) {
+
+        if (!mQuakeInitialised)
+        {
+            fboResolution = getDesiredFBOResolution(lefteye.getViewport().width);
+            CreateFBO(fbo, 0, fboResolution * 2, fboResolution);
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
+            QuakeJNILib.setResolution(fboResolution, fboResolution);
+            QuakeJNILib.initialise(commandLineParams);
+
+            // Create the image information
+            SetupUVCoords();
+
+            mQuakeInitialised = true;
+        }
 
         if (mQuakeInitialised) {
             //eulerAngles[offset + 0] = -pitch;
@@ -215,40 +382,104 @@ public class MainActivity
             //eulerAngles[offset + 2] = -roll;
             float[] eulerAngles = new float[3];
             headTransform.getEulerAngles(eulerAngles, 0);
+            QuakeJNILib.onNewFrame(-eulerAngles[0] / (M_PI / 180.0f), eulerAngles[1] / (M_PI / 180.0f), -eulerAngles[2] / (M_PI / 180.0f));
 
-            QuakeJNILib.onNewFrame(-eulerAngles[0] / (M_PI / 180.0f), eulerAngles[1] / (M_PI / 180.0f), eulerAngles[2] / (M_PI / 180.0f));
-        }
-    }
+            // Clear our matrices
+            for(int i=0;i<16;i++)
+            {
+                mtrxProjection[i] = 0.0f;
+                mtrxView[i] = 0.0f;
+                mtrxProjectionAndView[i] = 0.0f;
+            }
 
-    /**
-     * Draws a frame for an eye.
-     *
-     * @param eye The eye to render. Includes all required transformations.
-     */
-    @Override
-    public void onDrawEye(Eye eye) {
-        if (!mQuakeInitialised && eye.getType() == 2)
-        {
-            Log.d(TAG, "x = " + eye.getViewport().x);
-            Log.d(TAG, "y = " + eye.getViewport().y);
-            Log.d(TAG, "width = " + eye.getViewport().width);
-            Log.d(TAG, "height = " + eye.getViewport().height);
-            QuakeJNILib.setResolution(eye.getViewport().width, eye.getViewport().height);
-            QuakeJNILib.initialise(commandLineParams);
-            mQuakeInitialised = true;
-        }
+            // Create the triangles
+            SetupTriangle(0, 0, lefteye.getViewport().width*2, lefteye.getViewport().height);
 
-        if (mQuakeInitialised) {
+            // Setup our screen width and height for normal sprite translation.
+            Matrix.orthoM(mtrxProjection, 0, 0, lefteye.getViewport().width*2,
+                    0, lefteye.getViewport().height, 0, 50);
+
+            // Set the camera position (View matrix)
+            Matrix.setLookAtM(mtrxView, 0, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1.0f, 0.0f);
+
+            // Calculate the projection and view transformation
+            Matrix.multiplyMM(mtrxProjectionAndView, 0, mtrxProjection, 0, mtrxView, 0);
+
+            //Record the curent fbo
+            GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, currentFBO, 0);
+
+            //Bind our special fbo
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
             GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+            GLES20.glDepthFunc(GLES20.GL_LEQUAL);
+            GLES20.glEnable(GLES20.GL_SCISSOR_TEST);
+
+            GLES20.glScissor(0, 0, fboResolution*2, fboResolution);
+            GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
-            eye.getViewport().setGLScissor();
-            eye.getViewport().setGLViewport();
-
-            GLES20.glClearColor(0.5f, 0.0f, 0.5f, 1.0f);
-
             //Hopefully type indicates 0 = left, 1 = right
-            QuakeJNILib.onDrawEye(eye.getType() - 1, eye.getViewport().x, eye.getViewport().y);
+            QuakeJNILib.onDrawEye(0, 0, 0);
+            QuakeJNILib.onDrawEye(1, fboResolution, 0);
+
+            //Finished rendering to our frame buffer, now draw this to the target framebuffer
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, currentFBO[0]);
+
+            //eye.getViewport().setGLScissor();
+            GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
+
+            GLES20.glViewport(0, 0, lefteye.getViewport().width*2, lefteye.getViewport().height);
+
+            // Set our shader programm
+            GLES20.glUseProgram(sp_Image);
+
+            // get handle to vertex shader's vPosition member
+            mPositionHandle = GLES20.glGetAttribLocation(sp_Image, "vPosition");
+
+            // Enable generic vertex attribute array
+            GLES20.glEnableVertexAttribArray(mPositionHandle);
+
+            // Prepare the triangle coordinate data
+            GLES20.glVertexAttribPointer(mPositionHandle, 3,
+                    GLES20.GL_FLOAT, false, 0, vertexBuffer);
+
+            // Get handle to texture coordinates location
+            mTexCoordLoc = GLES20.glGetAttribLocation(sp_Image, "a_texCoord" );
+
+            // Enable generic vertex attribute array
+            GLES20.glEnableVertexAttribArray(mTexCoordLoc);
+
+            // Prepare the texturecoordinates
+            GLES20.glVertexAttribPointer(mTexCoordLoc, 2, GLES20.GL_FLOAT,
+                    false, 0, uvBuffer);
+
+            // Get handle to shape's transformation matrix
+            int mtrxhandle = GLES20.glGetUniformLocation(sp_Image, "uMVPMatrix");
+
+            // Apply the projection and view transformation
+            GLES20.glUniformMatrix4fv(mtrxhandle, 1, false, mtrxProjectionAndView, 0);
+
+            // Get handle to textures locations
+            int mSamplerLoc = GLES20.glGetUniformLocation (sp_Image, "s_texture" );
+
+            // Bind texture to fbo's color texture
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fbo.ColorTexture[0]);
+
+            // Set the sampler texture unit to our fbo's color texture
+            GLES20.glUniform1i(mSamplerLoc, 0);
+
+            // Draw the triangle
+            GLES20.glDrawElements(GLES20.GL_TRIANGLES, indices.length,
+                    GLES20.GL_UNSIGNED_SHORT, drawListBuffer);
+
+            int error = GLES20.glGetError();
+            if (error != GLES20.GL_NO_ERROR)
+                Log.d(TAG, "GLES20 Error = " + error);
+
+            // Disable vertex array
+            GLES20.glDisableVertexAttribArray(mPositionHandle);
+            GLES20.glDisableVertexAttribArray(mTexCoordLoc);
         }
     }
 
@@ -262,7 +493,7 @@ public class MainActivity
     /**
      * Called when the Cardboard trigger is pulled.
      */
-    @Override
+    //@Override
     public void onCardboardTrigger() {
         Log.i(TAG, "onCardboardTrigger");
 
@@ -576,4 +807,73 @@ public class MainActivity
         return keyCode%95+32;//Magic
     }
 
+
+    public void SetupUVCoords()
+    {
+        // Create our UV coordinates.
+        uvs = new float[] {
+                0.0f, 1.0f,
+                0.0f, 0.0f,
+                1.0f, 0.0f,
+                1.0f, 1.0f
+        };
+
+        // The texture buffer
+        ByteBuffer bb = ByteBuffer.allocateDirect(uvs.length * 4);
+        bb.order(ByteOrder.nativeOrder());
+        uvBuffer = bb.asFloatBuffer();
+        uvBuffer.put(uvs);
+        uvBuffer.position(0);
+
+        // Generate Textures, if more needed, alter these numbers.
+        GLES20.glGenTextures(1, texturenames, 0);
+
+        // Retrieve our image from resources.
+        int id = getResources().getIdentifier("mipmap/ic_launcher", null, getPackageName());
+
+        // Temporary create a bitmap
+        Bitmap bmp = BitmapFactory.decodeResource(getResources(), id);
+
+        // Bind texture to texturename
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texturenames[0]);
+
+        // Set filtering
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+
+        // Load the bitmap into the bound texture.
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0);
+
+        // We are done using the bitmap so we should recycle it.
+        bmp.recycle();
+
+    }
+
+    public void SetupTriangle(int x, int y, int width, int height)
+    {
+        // We have to create the vertices of our triangle.
+        vertices = new float[]
+                {
+                        x, y + height, 0.0f,
+                        x, y, 0.0f,
+                        x + width, y, 0.0f,
+                        x + width, y + height, 0.0f,
+                };
+        indices = new short[] {0, 1, 2, 0, 2, 3}; // The order of vertexrendering.
+
+        // The vertex buffer.
+        ByteBuffer bb = ByteBuffer.allocateDirect(vertices.length * 4);
+        bb.order(ByteOrder.nativeOrder());
+        vertexBuffer = bb.asFloatBuffer();
+        vertexBuffer.put(vertices);
+        vertexBuffer.position(0);
+
+        // initialize byte buffer for the draw list
+        ByteBuffer dlb = ByteBuffer.allocateDirect(indices.length * 2);
+        dlb.order(ByteOrder.nativeOrder());
+        drawListBuffer = dlb.asShortBuffer();
+        drawListBuffer.put(indices);
+        drawListBuffer.position(0);
+    }
 }
