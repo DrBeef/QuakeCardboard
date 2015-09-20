@@ -547,7 +547,7 @@ public class MainActivity
             keyCode = qKeyCode;
 
         QuakeJNILib.onKeyEvent( keyCode, action, character );
-        return true;
+        return false;
     }
 
     private static float getCenteredAxis(MotionEvent event,
@@ -637,20 +637,6 @@ public class MainActivity
 
     private float max(float axisValue, float axisValue2) {
         return (axisValue > axisValue2) ? axisValue : axisValue2;
-    }
-
-    @Override public boolean dispatchTouchEvent( MotionEvent event) {
-        int source = event.getSource();
-        int action = event.getAction();
-        float x = event.getRawX();
-        float y = event.getRawY();
-        if ( action == MotionEvent.ACTION_UP )
-        {
-            Log.v( TAG, "GLES3JNIActivity::dispatchTouchEvent( " + action + ", " + x + ", " + y + " )" );
-        }
-        QuakeJNILib.onTouchEvent( source, action, x, y );
-
-        return false;
     }
 
     public static final int K_TAB = 9;
