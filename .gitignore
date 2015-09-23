@@ -62,5 +62,3 @@ gen/*
 
 #specific files I don't want added
 build.bat
-cardboard.jar
-libproto*.jar

@@ -61,13 +61,15 @@ public class MainActivity
     private static final int GL_RGBA8 = 0x8058;
 
     private int[] currentFBO = new int[1];
-    int fboResolution = 0;
+    int fboEyeResolution = 0;
 
     private Vibrator vibrator;
     private float M_PI = 3.14159265358979323846f;
     public static AudioCallback mAudio;
     //Read these from a file and pass through
     String commandLineParams = new String("quake");
+
+    private CardboardView cardboardView;
 
     public static final String vs_Image =
             "uniform mat4 uMVPMatrix;" +
@@ -266,12 +268,8 @@ public class MainActivity
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
-        CardboardView cardboardView = (CardboardView) findViewById(R.id.cardboard_view);
+        cardboardView = (CardboardView) findViewById(R.id.cardboard_view);
         cardboardView.setEGLConfigChooser(new QuakeEGLConfigChooser());
-        //cardboardView.getHolder().setFormat(PixelFormat.RGBA_8888);
-        cardboardView.setEGLContextClientVersion(3);
-        cardboardView.setEGLContextFactory(new QuakeEGLContextFactory());
-
         cardboardView.setRenderer(this);
         setCardboardView(cardboardView);
 
@@ -346,7 +344,7 @@ public class MainActivity
          GLES20.glLinkProgram(sp_Image);                  // creates OpenGL ES program executable
      }
 
-    int getDesiredFBOResolution(int viewportWidth) {
+    int getDesiredfboEyeResolution(int viewportWidth) {
 
         if (viewportWidth > 1024)
             return 1024;
@@ -364,10 +362,10 @@ public class MainActivity
 
         if (!mQuakeInitialised)
         {
-            fboResolution = getDesiredFBOResolution(lefteye.getViewport().width);
-            CreateFBO(fbo, 0, fboResolution * 2, fboResolution);
-            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
-            QuakeJNILib.setResolution(fboResolution, fboResolution);
+            fboEyeResolution = getDesiredfboEyeResolution(lefteye.getViewport().width);
+            CreateFBO(fbo, 0, fboEyeResolution * 2, fboEyeResolution);
+            //GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
+            QuakeJNILib.setResolution(fboEyeResolution, fboEyeResolution);
             QuakeJNILib.initialise(commandLineParams);
 
             // Create the image information
@@ -393,11 +391,10 @@ public class MainActivity
             }
 
             // Create the triangles
-            SetupTriangle(0, 0, lefteye.getViewport().width*2, lefteye.getViewport().height);
+            SetupTriangle(0, 0, lefteye.getViewport().width * 2, lefteye.getViewport().height);
 
             // Setup our screen width and height for normal sprite translation.
-            Matrix.orthoM(mtrxProjection, 0, 0, lefteye.getViewport().width*2,
-                    0, lefteye.getViewport().height, 0, 50);
+            Matrix.orthoM(mtrxProjection, 0, 0, lefteye.getViewport().width * 2, 0, lefteye.getViewport().height, 0, 50);
 
             // Set the camera position (View matrix)
             Matrix.setLookAtM(mtrxView, 0, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1.0f, 0.0f);
@@ -414,13 +411,13 @@ public class MainActivity
             GLES20.glDepthFunc(GLES20.GL_LEQUAL);
             GLES20.glEnable(GLES20.GL_SCISSOR_TEST);
 
-            GLES20.glScissor(0, 0, fboResolution*2, fboResolution);
+            GLES20.glScissor(0, 0, fboEyeResolution*2, fboEyeResolution);
             GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
             //Hopefully type indicates 0 = left, 1 = right
             QuakeJNILib.onDrawEye(0, 0, 0);
-            QuakeJNILib.onDrawEye(1, fboResolution, 0);
+            QuakeJNILib.onDrawEye(1, fboEyeResolution, 0);
 
             //Finished rendering to our frame buffer, now draw this to the target framebuffer
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, currentFBO[0]);
@@ -428,7 +425,8 @@ public class MainActivity
             //eye.getViewport().setGLScissor();
             GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
 
-            GLES20.glViewport(0, 0, lefteye.getViewport().width*2, lefteye.getViewport().height);
+            GLES20.glViewport(0, 0, lefteye.getViewport().width*2,
+                    lefteye.getViewport().height);
 
             // Set our shader programm
             GLES20.glUseProgram(sp_Image);
@@ -478,8 +476,11 @@ public class MainActivity
                 Log.d(TAG, "GLES20 Error = " + error);
 
             // Disable vertex array
-            GLES20.glDisableVertexAttribArray(mPositionHandle);
-            GLES20.glDisableVertexAttribArray(mTexCoordLoc);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+            //GLES20.glDisableVertexAttribArray(mPositionHandle);
+            //GLES20.glDisableVertexAttribArray(mTexCoordLoc);
+
+            GLES20.glFlush();
         }
     }
 
