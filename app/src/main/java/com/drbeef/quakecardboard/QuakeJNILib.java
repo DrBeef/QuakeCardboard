@@ -9,12 +9,12 @@ public class QuakeJNILib {
 
     //Rendering and lifecycle
     public static native void setResolution( int width, int height );
-    public static native void initialise( String commandLineParams );
+    public static native void initialise( String gameFolder, String commandLineParams );
     public static native void onNewFrame( float pitch, float yaw, float roll );
     public static native void onDrawEye( int eye, int x, int y );
     public static native void onFinishFrame( );
 
     //Audio
     public static native void requestAudioData();
-    public static native void setCallbackObject(Object obj);
+    public static native void setCallbackObjects(Object obj1, Object obj2);
 }

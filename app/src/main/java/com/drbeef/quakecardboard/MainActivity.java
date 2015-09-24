@@ -15,6 +15,7 @@ import android.opengl.GLUtils;
 import android.opengl.Matrix;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Vibrator;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -50,9 +51,7 @@ import javax.microedition.khronos.opengles.GL10;
 
 public class MainActivity
         extends CardboardActivity
-//            extends Activity
-        implements CardboardView.Renderer
-//            implements GLSurfaceView.Renderer
+        implements CardboardView.Renderer, QuakeCallback
 {
     int[] texturenames = new int[1];
 
@@ -121,7 +120,10 @@ public class MainActivity
     public FloatBuffer uvBuffer;
     public static int sp_Image;
 
+    private String sdcard = Environment.getExternalStorageDirectory().getPath();
+
     public static boolean mQuakeInitialised = false;
+    public static boolean mVRModeChanged = true;
 
     static {
         try {
@@ -133,14 +135,14 @@ public class MainActivity
     }
 
     public void copy_asset(String name) {
-        File f = new File("/sdcard/QGVR/id1/" + name);
+        File f = new File(sdcard + "/Q4C/id1/" + name);
         if (!f.exists() ||
                 //If file was somehow corrupted, copy the back-up
                 f.length() < 500) {
 
             //Ensure we have an appropriate folder
-            new File("/sdcard/QGVR/id1").mkdirs();
-            copy_asset(name, "/sdcard/QGVR/id1/" + name);
+            new File(sdcard + "/Q4C/id1").mkdirs();
+            copy_asset(name, sdcard + "/Q4C/id1/" + name);
         }
     }
 
@@ -273,6 +275,8 @@ public class MainActivity
         cardboardView.setRenderer(this);
         setCardboardView(cardboardView);
 
+        //cardboardView.setVRModeEnabled(false);
+
          vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
         //At the very least ensure we have a directory containing a config file
@@ -289,15 +293,15 @@ public class MainActivity
             mAudio = new AudioCallback();
         }
 
-        QuakeJNILib.setCallbackObject(mAudio);
+        QuakeJNILib.setCallbackObjects(mAudio, this);
 
 
         //See if user is trying to use command line params
-        if(new File("/sdcard/QGVR/commandline.txt").exists())
+        if(new File(sdcard + "/Q4C/commandline.txt").exists())
         {
             BufferedReader br;
             try {
-                br = new BufferedReader(new FileReader("/sdcard/QGVR/commandline.txt"));
+                br = new BufferedReader(new FileReader(sdcard + "/Q4C/commandline.txt"));
                 String s;
                 StringBuilder sb=new StringBuilder(0);
                 while ((s=br.readLine())!=null)
@@ -327,7 +331,6 @@ public class MainActivity
 
         mWidth = width;
         mHeight = height;
-
     }
 
     @Override
@@ -350,26 +353,41 @@ public class MainActivity
             return 1024;
         if (viewportWidth > 512)
             return 512;
-        if (viewportWidth > 256)
-            return 256;
-
         //don't want to go lower than this
-        return 128;
+        return 256;
     }
 
     @Override
     public void onDrawFrame(HeadTransform headTransform, Eye lefteye, Eye righteye) {
 
+        if (mVRModeChanged)
+        {
+            Log.i(TAG, "mVRModeChanged");
+            if (fbo.FrameBuffer[0] != 0)
+                DestroyFBO(fbo);
+
+            if (cardboardView.getVRMode()) {
+                fboEyeResolution = getDesiredfboEyeResolution(lefteye.getViewport().width);
+                CreateFBO(fbo, 0, fboEyeResolution * 2, fboEyeResolution);
+                QuakeJNILib.setResolution(fboEyeResolution, fboEyeResolution);
+            }
+            else
+            {
+                CreateFBO(fbo, 0, lefteye.getViewport().width, lefteye.getViewport().height);
+                QuakeJNILib.setResolution(lefteye.getViewport().width, lefteye.getViewport().height);
+            }
+            mVRModeChanged = false;
+        }
+
         if (!mQuakeInitialised)
         {
-            fboEyeResolution = getDesiredfboEyeResolution(lefteye.getViewport().width);
-            CreateFBO(fbo, 0, fboEyeResolution * 2, fboEyeResolution);
-            //GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
-            QuakeJNILib.setResolution(fboEyeResolution, fboEyeResolution);
-            QuakeJNILib.initialise(commandLineParams);
+            QuakeJNILib.initialise(sdcard + "/Q4C", commandLineParams);
 
             // Create the image information
             SetupUVCoords();
+
+            //Reset our orientation
+            cardboardView.resetHeadTracker();
 
             mQuakeInitialised = true;
         }
@@ -380,7 +398,13 @@ public class MainActivity
             //eulerAngles[offset + 2] = -roll;
             float[] eulerAngles = new float[3];
             headTransform.getEulerAngles(eulerAngles, 0);
-            QuakeJNILib.onNewFrame(-eulerAngles[0] / (M_PI / 180.0f), eulerAngles[1] / (M_PI / 180.0f), -eulerAngles[2] / (M_PI / 180.0f));
+            if (cardboardView.getVRMode())
+                QuakeJNILib.onNewFrame(-eulerAngles[0] / (M_PI / 180.0f), eulerAngles[1] / (M_PI / 180.0f), -eulerAngles[2] / (M_PI / 180.0f));
+            else
+                //Non-vr, look straight ahead
+                QuakeJNILib.onNewFrame(0, 0, 0);
+
+
 
             // Clear our matrices
             for(int i=0;i<16;i++)
@@ -391,10 +415,16 @@ public class MainActivity
             }
 
             // Create the triangles
-            SetupTriangle(0, 0, lefteye.getViewport().width * 2, lefteye.getViewport().height);
+            if (cardboardView.getVRMode()) {
+                SetupTriangle(0, 0, lefteye.getViewport().width * 2, lefteye.getViewport().height);
+                Matrix.orthoM(mtrxProjection, 0, 0, lefteye.getViewport().width * 2, 0, lefteye.getViewport().height, 0, 50);
+            }
+            else
+            {
+                SetupTriangle(0, 0, lefteye.getViewport().width, lefteye.getViewport().height);
+                Matrix.orthoM(mtrxProjection, 0, 0, lefteye.getViewport().width, 0, lefteye.getViewport().height, 0, 50);
 
-            // Setup our screen width and height for normal sprite translation.
-            Matrix.orthoM(mtrxProjection, 0, 0, lefteye.getViewport().width * 2, 0, lefteye.getViewport().height, 0, 50);
+            }
 
             // Set the camera position (View matrix)
             Matrix.setLookAtM(mtrxView, 0, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1.0f, 0.0f);
@@ -411,13 +441,22 @@ public class MainActivity
             GLES20.glDepthFunc(GLES20.GL_LEQUAL);
             GLES20.glEnable(GLES20.GL_SCISSOR_TEST);
 
-            GLES20.glScissor(0, 0, fboEyeResolution*2, fboEyeResolution);
+            if (cardboardView.getVRMode()) {
+                GLES20.glScissor(0, 0, fboEyeResolution * 2, fboEyeResolution);
+            }
+            else  {
+                GLES20.glScissor(0, 0, lefteye.getViewport().width, lefteye.getViewport().height);
+            }
+
             GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
             //Hopefully type indicates 0 = left, 1 = right
             QuakeJNILib.onDrawEye(0, 0, 0);
-            QuakeJNILib.onDrawEye(1, fboEyeResolution, 0);
+
+            //Only draw right eye if we are in VR mode
+            if (cardboardView.getVRMode())
+                QuakeJNILib.onDrawEye(1, fboEyeResolution, 0);
 
             //Finished rendering to our frame buffer, now draw this to the target framebuffer
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, currentFBO[0]);
@@ -425,8 +464,10 @@ public class MainActivity
             //eye.getViewport().setGLScissor();
             GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
 
-            GLES20.glViewport(0, 0, lefteye.getViewport().width*2,
-                    lefteye.getViewport().height);
+            if (cardboardView.getVRMode())
+                GLES20.glViewport(0, 0, lefteye.getViewport().width*2, lefteye.getViewport().height);
+            else
+                GLES20.glViewport(0, 0, lefteye.getViewport().width, lefteye.getViewport().height);
 
             // Set our shader programm
             GLES20.glUseProgram(sp_Image);
@@ -477,9 +518,8 @@ public class MainActivity
 
             // Disable vertex array
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
-            //GLES20.glDisableVertexAttribArray(mPositionHandle);
-            //GLES20.glDisableVertexAttribArray(mTexCoordLoc);
 
+            //And flush..
             GLES20.glFlush();
         }
     }
@@ -533,12 +573,6 @@ public class MainActivity
                 )
             return false;
 
-        if (keyCode == KeyEvent.KEYCODE_BACK)
-        {
-            //Pass through
-            QuakeJNILib.onKeyEvent( keyCode, action, character );
-        }
-
         //Convert to Quake keys
         character = getCharacter(keyCode, event);
         int qKeyCode = convertKeyCode(keyCode, event);
@@ -547,8 +581,11 @@ public class MainActivity
         if (qKeyCode != -1)
             keyCode = qKeyCode;
 
+        if (keyCode == K_ESCAPE)
+            cardboardView.resetHeadTracker();
+
         QuakeJNILib.onKeyEvent( keyCode, action, character );
-        return false;
+        return true;
     }
 
     private static float getCenteredAxis(MotionEvent event,
@@ -586,10 +623,14 @@ public class MainActivity
                 QuakeJNILib.onTouchEvent( source, action, x, y );
 
                 float z = getCenteredAxis(event, MotionEvent.AXIS_Z);
-                float rz = 0.0f;//getCenteredAxis(event, MotionEvent.AXIS_RZ);
+                float rz = 0.0f;
+                if (!cardboardView.getVRMode())
+                    rz = -getCenteredAxis(event, MotionEvent.AXIS_RZ);
                 //For the samsung game pad (uses different axes for the second stick)
                 float rx = getCenteredAxis(event, MotionEvent.AXIS_RX);
-                float ry = 0.0f;//getCenteredAxis(event, MotionEvent.AXIS_RY);
+                float ry = 0.0f;
+                if (!cardboardView.getVRMode())
+                    ry = -getCenteredAxis(event, MotionEvent.AXIS_RY);
 
                 //let's figure it out
                 if (gamepadType == 0)
@@ -758,7 +799,7 @@ public class MainActivity
             case KeyEvent.KEYCODE_BUTTON_A:
                 return K_ENTER;
             case KeyEvent.KEYCODE_BUTTON_B:
-                return 'r';
+                return K_MOUSE1;
             case KeyEvent.KEYCODE_BUTTON_X:
                 return '#'; //prev weapon, set in the config.txt as impulse 12
             case KeyEvent.KEYCODE_BUTTON_Y:
@@ -863,4 +904,18 @@ public class MainActivity
         drawListBuffer.put(indices);
         drawListBuffer.position(0);
     }
+
+    @Override
+    public void SwitchVRMode() {
+        cardboardView.setVRModeEnabled(!cardboardView.getVRMode());
+        mVRModeChanged = true;
+    }
+
+    @Override
+    public void Exit() {
+        mAudio.terminateAudio();
+        System.exit(0);
+    }
+
+
 }

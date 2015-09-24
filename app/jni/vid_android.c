@@ -522,7 +522,11 @@ static struct {
 
 void IN_Move(void)
 {
-	cl.viewangles[PITCH] = move_event.pitch;
+	bool ignorePitch = move_event.pitch == 0.0f &&
+			move_event.yaw == 0.0f &&
+			move_event.roll == 0.0f;
+	if (!ignorePitch)
+		cl.viewangles[PITCH] = move_event.pitch;
 	if (cl_yawmode.integer != 1)
 		cl.viewangles[YAW] -= move_event.previous_yaw;
 	cl.viewangles[YAW] += move_event.yaw ;
@@ -541,5 +545,5 @@ void QC_SetResolution(int width, int height)
 {
 	andrw=width;
 	andrh=height;
-	//VID_Restart_f();
+	VID_Restart_f();
 }

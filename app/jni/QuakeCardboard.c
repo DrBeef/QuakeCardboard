@@ -27,13 +27,17 @@ extern int main (int argc, char **argv);
 
 static JavaVM *jVM;
 static jobject audioBuffer=0;
-static jobject qCallbackObj=0;
+static jobject audioCallbackObj=0;
 
 jmethodID android_initAudio;
 jmethodID android_writeAudio;
 jmethodID android_pauseAudio;
 jmethodID android_resumeAudio;
 jmethodID android_terminateAudio;
+
+static jobject quakeCallbackObj=0;
+jmethodID android_SwitchVRMode;
+jmethodID android_Exit;
 
 void jni_initAudio(void *buffer, int size)
 {
@@ -42,7 +46,7 @@ void jni_initAudio(void *buffer, int size)
     (*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4);
     tmp = (*env)->NewDirectByteBuffer(env, buffer, size);
     audioBuffer = (jobject)(*env)->NewGlobalRef(env, tmp);
-    return (*env)->CallVoidMethod(env, qCallbackObj, android_initAudio, size);
+    return (*env)->CallVoidMethod(env, audioCallbackObj, android_initAudio, size);
 }
 
 void jni_writeAudio(int offset, int length)
@@ -53,7 +57,7 @@ void jni_writeAudio(int offset, int length)
     {
     	(*jVM)->AttachCurrentThread(jVM,&env, NULL);
     }
-    (*env)->CallVoidMethod(env, qCallbackObj, android_writeAudio, audioBuffer, offset, length);
+    (*env)->CallVoidMethod(env, audioCallbackObj, android_writeAudio, audioBuffer, offset, length);
 }
 
 void jni_pauseAudio()
@@ -64,7 +68,7 @@ void jni_pauseAudio()
     {
     	(*jVM)->AttachCurrentThread(jVM,&env, NULL);
     }
-    (*env)->CallVoidMethod(env, qCallbackObj, android_pauseAudio);
+    (*env)->CallVoidMethod(env, audioCallbackObj, android_pauseAudio);
 }
 
 void jni_resumeAudio()
@@ -75,7 +79,7 @@ void jni_resumeAudio()
     {
     	(*jVM)->AttachCurrentThread(jVM,&env, NULL);
     }
-    (*env)->CallVoidMethod(env, qCallbackObj, android_resumeAudio);
+    (*env)->CallVoidMethod(env, audioCallbackObj, android_resumeAudio);
 }
 
 void jni_terminateAudio()
@@ -86,7 +90,25 @@ void jni_terminateAudio()
     {
     	(*jVM)->AttachCurrentThread(jVM,&env, NULL);
     }
-    (*env)->CallVoidMethod(env, qCallbackObj, android_terminateAudio);
+    (*env)->CallVoidMethod(env, audioCallbackObj, android_terminateAudio);
+}
+
+
+
+void jni_SwitchVRMode()
+{
+	JNIEnv *env;
+	jobject tmp;
+	(*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4);
+	(*env)->CallVoidMethod(env, quakeCallbackObj, android_SwitchVRMode);
+}
+
+void jni_Exit()
+{
+	JNIEnv *env;
+	jobject tmp;
+	(*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4);
+	(*env)->CallVoidMethod(env, quakeCallbackObj, android_Exit);
 }
 
 //Timing stuff for joypad control
@@ -134,6 +156,8 @@ int returnvalue = -1;
 void QC_exit(int exitCode)
 {
 	returnvalue = exitCode;
+	Host_Shutdown();
+	jni_Exit();
 }
 
 vec3_t hmdorientation;
@@ -224,13 +248,16 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setResolution(
 	QC_SetResolution(width, height);
 }
 
-JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_initialise( JNIEnv * env, jobject obj, jstring commandLineParams )
+JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_initialise( JNIEnv * env, jobject obj, jstring gameFolder, jstring commandLineParams )
 {
 	static qboolean quake_initialised = false;
 	if (!quake_initialised)
 	{
-		chdir("/sdcard/QGVR");
 		jboolean iscopy;
+		const char *folder = (*env)->GetStringUTFChars(env, gameFolder, &iscopy);
+		chdir(folder);
+		(*env)->ReleaseStringUTFChars(env, gameFolder, folder);
+
 		const char *arg = (*env)->GetStringUTFChars(env, commandLineParams, &iscopy);
 
 		char *cmdLine = NULL;
@@ -320,23 +347,33 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onMotionEvent(
 	if (source == SOURCE_JOYSTICK || source == SOURCE_GAMEPAD)
 	{
 		last_joystick_x=x;
+		last_joystick_y=y;
 	}
 }
 
-JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setCallbackObject(JNIEnv *env, jclass c, jobject obj)
+JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setCallbackObjects(JNIEnv *env, jclass c, jobject obj1, jobject obj2)
 {
-    qCallbackObj = obj;
-    jclass qCallbackClass;
+    jclass audioCallbackClass;
 
     (*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4);
-    qCallbackObj = (jobject)(*env)->NewGlobalRef(env, obj);
-    qCallbackClass = (*env)->GetObjectClass(env, qCallbackObj);
 
-    android_initAudio = (*env)->GetMethodID(env,qCallbackClass,"initAudio","(I)V");
-    android_writeAudio = (*env)->GetMethodID(env,qCallbackClass,"writeAudio","(Ljava/nio/ByteBuffer;II)V");
-    android_pauseAudio = (*env)->GetMethodID(env,qCallbackClass,"pauseAudio","()V");
-    android_resumeAudio = (*env)->GetMethodID(env,qCallbackClass,"resumeAudio","()V");
-    android_terminateAudio = (*env)->GetMethodID(env,qCallbackClass,"terminateAudio","()V");
+    audioCallbackObj = (jobject)(*env)->NewGlobalRef(env, obj1);
+    audioCallbackClass = (*env)->GetObjectClass(env, audioCallbackObj);
+
+    android_initAudio = (*env)->GetMethodID(env,audioCallbackClass,"initAudio","(I)V");
+    android_writeAudio = (*env)->GetMethodID(env,audioCallbackClass,"writeAudio","(Ljava/nio/ByteBuffer;II)V");
+    android_pauseAudio = (*env)->GetMethodID(env,audioCallbackClass,"pauseAudio","()V");
+    android_resumeAudio = (*env)->GetMethodID(env,audioCallbackClass,"resumeAudio","()V");
+    android_terminateAudio = (*env)->GetMethodID(env,audioCallbackClass,"terminateAudio","()V");
+
+
+	jclass quakeCallbackClass;
+
+	quakeCallbackObj = (jobject)(*env)->NewGlobalRef(env, obj2);
+	quakeCallbackClass = (*env)->GetObjectClass(env, quakeCallbackObj);
+
+	android_SwitchVRMode = (*env)->GetMethodID(env,quakeCallbackClass,"SwitchVRMode","()V");
+	android_Exit = (*env)->GetMethodID(env,quakeCallbackClass,"Exit","()V");
 }
 
 JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_requestAudioData(JNIEnv *env, jclass c, jlong handle)
