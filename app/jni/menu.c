@@ -35,10 +35,15 @@ static cvar_t menu_progs = { 0, "menu_progs", "menu.dat", "name of quakec menu.d
 
 static int NehGameType;
 
+//Game always starts in vr mode
+static qboolean vrMode = true;
+
 enum m_state_e m_state = m_main;
 char m_return_reason[128];
 
 extern vec3_t hmdorientation;
+
+extern void jni_SwitchVRMode();
 
 //Calculate the y-offset of the status bar dependent on where the user is looking
 int Menu_GetYOffset()
@@ -50,12 +55,12 @@ int Menu_GetYOffset()
 static float hmdYaw = 0;
 int Menu_GetXOffset()
 {
-	//This will give the Menu depth in the 3D space
+/*	//This will give the Menu depth in the 3D space
 	int yaw = ((hmdorientation[YAW] - hmdYaw) * 3);
 	//rudimentary clamp
 	yaw = (yaw > 110) ? 110 : yaw;
-	yaw = (yaw < -110) ? -110 : yaw;
-	return (r_stereo_side ? -25 : 25) + yaw;
+	yaw = (yaw < -110) ? -110 : yaw;*/
+	return (r_stereo_side ? -20 : 20);// + yaw;
 }
 
 
@@ -396,7 +401,7 @@ static void M_Demo_Key (int k, int ascii)
 static int	m_main_cursor;
 static qboolean m_missingdata = false;
 
-static int MAIN_ITEMS = 4; // Nehahra: Menu Disable
+static int MAIN_ITEMS = 5; // Nehahra: Menu Disable
 
 
 void M_Menu_Main_f (void)
@@ -448,7 +453,7 @@ void M_Menu_Main_f (void)
 			MAIN_ITEMS = 7;
 	}
 	else
-		MAIN_ITEMS = 5;
+		MAIN_ITEMS = 6;
 
 	// check if the game data is missing and use a different main menu if so
 	m_missingdata = !forceqmenu.integer && Draw_CachePic (s)->tex == r_texture_notexture;
@@ -517,22 +522,27 @@ static void M_Main_Draw (void)
 	M_DrawPic (16, 4, "gfx/qplaque");
 	p = Draw_CachePic ("gfx/ttl_main");
 	M_DrawPic ( (320-p->width)/2, 4, "gfx/ttl_main");
+
+	M_DrawTextBox(72, 30, 20, 1);
+	M_Print(86, 38, va(vabuf, sizeof(vabuf), "Switch %s VR Mode", vrMode ? "Off" : "On"));
+
+
 // Nehahra
 	if (gamemode == GAME_NEHAHRA)
 	{
 		if (NehGameType == TYPE_BOTH)
-			M_DrawPic (72, 32, "gfx/mainmenu");
+			M_DrawPic (72, 54, "gfx/mainmenu");
 		else if (NehGameType == TYPE_GAME)
-			M_DrawPic (72, 32, "gfx/gamemenu");
+			M_DrawPic (72, 54, "gfx/gamemenu");
 		else
-			M_DrawPic (72, 32, "gfx/demomenu");
+			M_DrawPic (72, 54, "gfx/demomenu");
 	}
 	else
-		M_DrawPic (72, 32, "gfx/mainmenu");
+		M_DrawPic (72, 54, "gfx/mainmenu");
 
 	f = (int)(realtime * 10)%6;
 
-	M_DrawPic (54, 32 + m_main_cursor * 20, va(vabuf, sizeof(vabuf), "gfx/menudot%i", f+1));
+	M_DrawPic (54, 34 + m_main_cursor * 20, va(vabuf, sizeof(vabuf), "gfx/menudot%i", f+1));
 }
 
 
@@ -744,24 +754,30 @@ static void M_Main_Key (int key, int ascii)
 			switch (m_main_cursor)
 			{
 			case 0:
-				M_Menu_SinglePlayer_f ();
+				vrMode = !vrMode;
+				jni_SwitchVRMode();
 				break;
 
 			case 1:
-				M_Menu_MultiPlayer_f ();
+				M_Menu_SinglePlayer_f ();
 				break;
 
 			case 2:
-				M_Menu_Options_f ();
+				M_Menu_MultiPlayer_f ();
 				break;
 
 			case 3:
-				M_Menu_Help_f ();
+				M_Menu_Options_f ();
 				break;
 
 			case 4:
+				M_Menu_Help_f ();
+				break;
+
+			case 5:
 				M_Menu_Quit_f ();
 				break;
+
 			}
 		}
 	}
