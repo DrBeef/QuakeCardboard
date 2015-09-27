@@ -1660,20 +1660,21 @@ static void M_Menu_Options_AdjustSliders (int dir)
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++)
 		 {
-			 if (dir == 1) {
-				 andrw *= 2;
-				 if (andrw > 2048)
-					 andrw = 256;
-			 }
-			 else
-			 {
-				 andrw /= 2;
-				 if (andrw < 256)
-					 andrw = 2048;
-			 }
+			 if (vrMode) {
+				 if (dir == 1) {
+					 andrw *= 2;
+					 if (andrw > 2048)
+						 andrw = 256;
+				 }
+				 else {
+					 andrw /= 2;
+					 if (andrw < 256)
+						 andrw = 2048;
+				 }
 
-			 //Push back up to Java
-			 jni_setEyeBufferResolution(andrw);
+				 //Push back up to Java
+				 jni_setEyeBufferResolution(andrw);
+			 }
 		 }
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&crosshair, bound(0, crosshair.integer + dir, 7));
@@ -1762,7 +1763,10 @@ static void M_Options_Draw (void)
 	M_Options_PrintCommand( "    Customize controls", true);
 	M_Options_PrintCommand( "         Go to console", true);
 	M_Options_PrintCommand( "     Reset to defaults", true);
-	M_Options_PrintSlider(  " Eye Buffer Resolution", vrMode, andrw, 256, 2048);
+	if (vrMode)
+		M_Options_PrintSlider(  " Eye Buffer Resolution", true, andrw, 256, 2048);
+	else
+		M_Options_PrintCommand( " Eye Buffer Resolution     n/a", false);
 	M_Options_PrintCommand( "      Yaw Control Mode", true);
 	M_Options_PrintSlider(  "             Crosshair", true, crosshair.value, 0, 7);
 	M_Options_PrintSlider(  "         Field of View", true, scr_fov.integer, 1, 170);
