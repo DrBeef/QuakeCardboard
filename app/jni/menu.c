@@ -42,7 +42,9 @@ enum m_state_e m_state = m_main;
 char m_return_reason[128];
 
 extern vec3_t hmdorientation;
+extern int andrw;
 
+extern void jni_setEyeBufferResolution(int resolution);
 extern void jni_SwitchVRMode();
 
 //Calculate the y-offset of the status bar dependent on where the user is looking
@@ -1656,6 +1658,23 @@ static void M_Menu_Options_AdjustSliders (int dir)
 	     if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++) ;
+	else if (options_cursor == optnum++)
+		 {
+			 if (dir == 1) {
+				 andrw *= 2;
+				 if (andrw > 2048)
+					 andrw = 256;
+			 }
+			 else
+			 {
+				 andrw /= 2;
+				 if (andrw < 256)
+					 andrw = 2048;
+			 }
+
+			 //Push back up to Java
+			 jni_setEyeBufferResolution(andrw);
+		 }
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&crosshair, bound(0, crosshair.integer + dir, 7));
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&scr_fov, bound(1, scr_fov.integer + dir * 1, 170));
@@ -1673,7 +1692,7 @@ static void M_Menu_Options_AdjustSliders (int dir)
 		}
 	}
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&showfps, !showfps.integer);
-	else if (options_cursor == optnum++) {f = !(showdate.integer && showtime.integer);Cvar_SetValueQuick(&showdate, f);Cvar_SetValueQuick(&showtime, f);}
+//	else if (options_cursor == optnum++) {f = !(showdate.integer && showtime.integer);Cvar_SetValueQuick(&showdate, f);Cvar_SetValueQuick(&showtime, f);}
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&r_hdr_scenebrightness, bound(1, r_hdr_scenebrightness.value + dir * 0.0625, 4));
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&v_contrast, bound(1, v_contrast.value + dir * 0.0625, 4));
@@ -1743,12 +1762,12 @@ static void M_Options_Draw (void)
 	M_Options_PrintCommand( "    Customize controls", true);
 	M_Options_PrintCommand( "         Go to console", true);
 	M_Options_PrintCommand( "     Reset to defaults", true);
+	M_Options_PrintSlider(  " Eye Buffer Resolution", vrMode, andrw, 256, 2048);
 	M_Options_PrintCommand( "      Yaw Control Mode", true);
 	M_Options_PrintSlider(  "             Crosshair", true, crosshair.value, 0, 7);
 	M_Options_PrintSlider(  "         Field of View", true, scr_fov.integer, 1, 170);
 	M_Options_PrintCheckbox("            Always Run", true, cl_forwardspeed.value > 200);
 	M_Options_PrintCheckbox("        Show Framerate", true, showfps.integer);
-	M_Options_PrintCheckbox("    Show Date and Time", true, showdate.integer && showtime.integer);
 	M_Options_PrintCommand( "     Custom Brightness", true);
 	M_Options_PrintSlider(  "       Game Brightness", true, r_hdr_scenebrightness.value, 1, 4);
 	M_Options_PrintSlider(  "            Brightness", true, v_contrast.value, 1, 2);
@@ -1792,7 +1811,7 @@ static void M_Options_Key (int k, int ascii)
 		case 2:
 			M_Menu_Reset_f ();
 			break;
-		case 3:
+		case 4:
 			M_Menu_YawControl_f ();
 			break;
 		case 9:

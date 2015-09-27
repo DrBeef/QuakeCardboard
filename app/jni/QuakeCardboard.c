@@ -37,6 +37,7 @@ jmethodID android_terminateAudio;
 
 static jobject quakeCallbackObj=0;
 jmethodID android_SwitchVRMode;
+jmethodID android_SetEyeBufferResolution;
 jmethodID android_Exit;
 
 void jni_initAudio(void *buffer, int size)
@@ -101,6 +102,17 @@ void jni_SwitchVRMode()
 	jobject tmp;
 	(*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4);
 	(*env)->CallVoidMethod(env, quakeCallbackObj, android_SwitchVRMode);
+}
+
+void jni_setEyeBufferResolution(int resolution)
+{
+	if (audioBuffer==0) return;
+	JNIEnv *env;
+	if (((*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4))<0)
+	{
+		(*jVM)->AttachCurrentThread(jVM,&env, NULL);
+	}
+	(*env)->CallVoidMethod(env, quakeCallbackObj, android_SetEyeBufferResolution, resolution);
 }
 
 void jni_Exit()
@@ -373,6 +385,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setCallbackObj
 	quakeCallbackClass = (*env)->GetObjectClass(env, quakeCallbackObj);
 
 	android_SwitchVRMode = (*env)->GetMethodID(env,quakeCallbackClass,"SwitchVRMode","()V");
+	android_SetEyeBufferResolution = (*env)->GetMethodID(env,quakeCallbackClass,"SetEyeBufferResolution","(I)V");
 	android_Exit = (*env)->GetMethodID(env,quakeCallbackClass,"Exit","()V");
 }
 

@@ -61,6 +61,8 @@ public class MainActivity
 
     private int[] currentFBO = new int[1];
     int fboEyeResolution = 0;
+    //This is set when the user opts to use a different resolution to the one picked as the default
+    int desiredEyeBufferResolution = -1;
 
     private Vibrator vibrator;
     private float M_PI = 3.14159265358979323846f;
@@ -349,12 +351,19 @@ public class MainActivity
 
     int getDesiredfboEyeResolution(int viewportWidth) {
 
+        if (desiredEyeBufferResolution != -1)
+            return desiredEyeBufferResolution;
+
+        //Select based on viewport width
         if (viewportWidth > 1024)
-            return 1024;
-        if (viewportWidth > 512)
-            return 512;
-        //don't want to go lower than this
-        return 256;
+            desiredEyeBufferResolution = 1024;
+        else if (viewportWidth > 512)
+            desiredEyeBufferResolution = 512;
+        else
+            //don't want to go lower than this
+            desiredEyeBufferResolution = 256;
+
+        return desiredEyeBufferResolution;
     }
 
     @Override
@@ -908,6 +917,14 @@ public class MainActivity
     @Override
     public void SwitchVRMode() {
         cardboardView.setVRModeEnabled(!cardboardView.getVRMode());
+        mVRModeChanged = true;
+    }
+
+    @Override
+    public void SetEyeBufferResolution(int newResolution) {
+        desiredEyeBufferResolution = newResolution;
+
+        //This will cause video reset
         mVRModeChanged = true;
     }
 

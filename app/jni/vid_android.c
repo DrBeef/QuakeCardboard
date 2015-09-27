@@ -270,7 +270,8 @@ void GLES_Init(void)
 	Cvar_SetQuick(&gl_info_driver, gl_driver);
 }
 
-int andrw=640;int andrh=480;
+int andrw=640;
+int andrh=480;
 
 qboolean VID_InitMode(viddef_mode_t *mode)
 {
