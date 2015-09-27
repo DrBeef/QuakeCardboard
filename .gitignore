@@ -59,6 +59,3 @@ bin/*
 gen/*
 .idea/*
 .gradle/*
-
-#specific files I don't want added
-build.bat

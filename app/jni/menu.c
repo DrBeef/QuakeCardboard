@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mprogdefs.h"
 
-#define QC_VERSION  "1.1.0"
+#define QC_VERSION  "1.0"
 
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
@@ -3367,10 +3367,7 @@ static const char *m_credits_message[11];
 static int M_CreditsMessage(const char *line1, const char *line2,
 		const char *line3, const char *line4,
 		const char *line5, const char *line6,
-		const char *line7, const char *line8,
-		const char *line9, const char *line10,
-		const char *line11, const char *line12,
-		const char *line13)
+		const char *line7)
 {
 	int line = 0;
 	m_credits_message[line++] = line1;
@@ -3380,12 +3377,6 @@ static int M_CreditsMessage(const char *line1, const char *line2,
 	m_credits_message[line++] = line5;
 	m_credits_message[line++] = line6;
 	m_credits_message[line++] = line7;
-	m_credits_message[line++] = line8;
-	m_credits_message[line++] = line9;
-	m_credits_message[line++] = line10;
-	m_credits_message[line++] = line11;
-	m_credits_message[line++] = line12;
-	m_credits_message[line++] = line13;
 	m_credits_message[line++] = NULL;
 	return 1;
 }
@@ -3393,16 +3384,10 @@ static int M_CreditsMessage(const char *line1, const char *line2,
 static void M_Credits_Draw (void)
 {
 	M_CreditsMessage(
-			"   -=  QUAKE for GearVR "QC_VERSION" =-   ",
+			"   -=  QUAKE for Cardboard "QC_VERSION" =-   ",
 			"",
-			"  Developer - Simon Brown (@DrBeef)",
-			"",
-			"  With special thanks to..         ",
-			"  Testers            - mallmagician",
-			"                     - baggyg      ",
-			"  Icon Design        - WormSlayer  ",
+			"  Coding             - DrBeef)",
 			"  DarkPlaces Engine  - LordHavoc   ",
-			"  QI4A               - n0n3m4      ",
 			"",
 			"",
 			"    ** Please Press Any Button **  ");
