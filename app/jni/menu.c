@@ -36,7 +36,7 @@ static cvar_t menu_progs = { 0, "menu_progs", "menu.dat", "name of quakec menu.d
 static int NehGameType;
 
 //Game always starts in vr mode
-static qboolean vrMode = true;
+qboolean vrMode = true;
 
 enum m_state_e m_state = m_main;
 char m_return_reason[128];

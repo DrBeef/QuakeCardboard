@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 int cl_available = true;
 
 qboolean vid_supportrefreshrate = false;
+extern qboolean vrMode;
+
 
 void VID_Shutdown(void)
 {
@@ -481,10 +483,21 @@ void QC_Analog(int enable,float x,float y)
 void QC_MotionEvent(float delta, float dx, float dy)
 {
 	static bool canAdjust = true;
-	if (cl_yawmode.integer == 1)
+
+	//If not in vr mode, then always use yaw stick control
+	if (cl_yawmode.integer == 2 || !vrMode)
 	{
-		if (fabs(dx) > 0.4 && canAdjust && delta != -1.0f)
-		{
+		in_mouse_x+=(dx*delta);
+		in_mouse_y+=(dy*delta);
+		in_windowmouse_x += (dx*delta);
+		if (in_windowmouse_x<0) in_windowmouse_x=0;
+		if (in_windowmouse_x>andrw-1) in_windowmouse_x=andrw-1;
+		in_windowmouse_y += (dy*delta);
+		if (in_windowmouse_y<0) in_windowmouse_y=0;
+		if (in_windowmouse_y>andrh-1) in_windowmouse_y=andrh-1;
+	}
+	else if (cl_yawmode.integer == 1) {
+		if (fabs(dx) > 0.4 && canAdjust && delta != -1.0f) {
 			if (dx > 0.0)
 				cl.comfortInc--;
 			else
@@ -495,24 +508,13 @@ void QC_MotionEvent(float delta, float dx, float dy)
 			if (cl.comfortInc >= max)
 				cl.comfortInc = 0;
 			if (cl.comfortInc < 0)
-				cl.comfortInc = max-1;
+				cl.comfortInc = max - 1;
 
 			canAdjust = false;
 		}
 
 		if (fabs(dx) < 0.3)
 			canAdjust = true;
-	}
-	else if (cl_yawmode.integer == 2)
-	{
-		in_mouse_x+=(dx*delta);
-		in_mouse_y+=(dy*delta);
-		in_windowmouse_x += (dx*delta);
-		if (in_windowmouse_x<0) in_windowmouse_x=0;
-		if (in_windowmouse_x>andrw-1) in_windowmouse_x=andrw-1;
-		in_windowmouse_y += (dy*delta);
-		if (in_windowmouse_y<0) in_windowmouse_y=0;
-		if (in_windowmouse_y>andrh-1) in_windowmouse_y=andrh-1;
 	}
 }
 
