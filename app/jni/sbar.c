@@ -119,13 +119,13 @@ static void Sbar_IntermissionOverlay (void);
 static void Sbar_FinaleOverlay (void);
 
 
-
+extern qboolean vrMode;
 extern vec3_t hmdorientation;
 
 //Calculate the y-offset of the status bar dependent on where the user is looking
 int Sbar_GetYOffset()
 {
-	if (hmdorientation[PITCH] <= 15.0f)
+	if (hmdorientation[PITCH] <= 15.0f || !vrMode)
 		return 0;
 
 	int offset = (vid_conheight.value * ((hmdorientation[PITCH] - 15.0f) / 90.0f));
@@ -135,12 +135,11 @@ int Sbar_GetYOffset()
 
 int Sbar_GetXOffset()
 {
+	if (!vrMode)
+		return 0;
+
 	//This will give the status bar depth in the 3D space
-	int yaw = 0;//(hmdorientation[YAW] * 3);
-	//rudimentary clamp
-	//yaw = (yaw > 40) ? 40 : yaw;
-	//yaw = (yaw < -40) ? -40 : yaw;
-	return (r_stereo_side ? -20 : 20) + yaw;
+	return (r_stereo_side ? -20 : 20);
 }
 
 /*
