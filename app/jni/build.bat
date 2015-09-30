@@ -9,11 +9,11 @@ copy .\armeabi-v7a\ lib\armeabi-v7a\*
 7z a -x!*.jar libs.zip .\lib*
 rename libs.zip libs.jar
 
-REM Create an archive of the java source
+REM Create an archive of the source
 cd ..\src\main\assets\source
 del QuakeCardboardSource.zip
 REM exclude unnecessary files from build
-7z a -r -x!.git* -x!*.o -x!*.d -x!obj -x!*.bin -x!app\build -x!app\libs -x!*.jar -x!*.so -x!*.log QuakeCardboardSource.zip ..\..\..\..\..\*
+7z a -r -x!.git* -x!*.o -x!*.d -x!obj -x!*.bin -x!app\build -x!app\libs -x!*.jar -x!*.so -x!*.log -x!*.jks QuakeCardboardSource.zip ..\..\..\..\..\*
 
 
 cd ..\..\..\..\jni

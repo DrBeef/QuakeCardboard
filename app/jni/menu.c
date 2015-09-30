@@ -50,6 +50,9 @@ extern void jni_SwitchVRMode();
 //Calculate the y-offset of the status bar dependent on where the user is looking
 int Menu_GetYOffset()
 {
+	if (!vrMode)
+		return 0;
+
 	return ((vid_conheight.value * 0.5) * ((hmdorientation[PITCH]) / -90.0f)) + 80;
 }
 
@@ -57,11 +60,9 @@ int Menu_GetYOffset()
 static float hmdYaw = 0;
 int Menu_GetXOffset()
 {
-/*	//This will give the Menu depth in the 3D space
-	int yaw = ((hmdorientation[YAW] - hmdYaw) * 3);
-	//rudimentary clamp
-	yaw = (yaw > 110) ? 110 : yaw;
-	yaw = (yaw < -110) ? -110 : yaw;*/
+	if (!vrMode)
+		return 0;
+
 	return (r_stereo_side ? -20 : 20);// + yaw;
 }
 
@@ -2995,10 +2996,11 @@ static void M_Menu_YawControl_Draw (void)
 	{
 		M_Options_PrintCommand(" ", true);
 		M_Options_PrintCommand(" ", true);
-		M_Options_PrintCommand("WARNING: Yaw controlled by stick can", true);
-		M_Options_PrintCommand("induce severe nausea in those not used to it.", true);
+		M_Options_PrintCommand("WARNING: Yaw controlled by stick", true);
+		M_Options_PrintCommand("can induce severe nausea in ", true);
+		M_Options_PrintCommand("those not used to it.", true);
 		M_Options_PrintCommand(" ", true);
-		M_Options_PrintCommand("* Using this mode is at your own risk! *", true);
+		M_Options_PrintCommand("* Use this mode at your own risk! *", true);
 	}
 }
 
