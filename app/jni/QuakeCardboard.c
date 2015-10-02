@@ -123,6 +123,9 @@ void jni_Exit()
 	(*env)->CallVoidMethod(env, quakeCallbackObj, android_Exit);
 }
 
+//Retain the folder we are using
+char *strGameFolder = NULL;
+
 //Timing stuff for joypad control
 long oldtime=0;
 long delta=0;
@@ -266,8 +269,9 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_initialise( JN
 	if (!quake_initialised)
 	{
 		jboolean iscopy;
-		const char *folder = (*env)->GetStringUTFChars(env, gameFolder, &iscopy);
+		const char * folder = (*env)->GetStringUTFChars(env, gameFolder, &iscopy);
 		chdir(folder);
+		strGameFolder = strdup(folder);
 		(*env)->ReleaseStringUTFChars(env, gameFolder, folder);
 
 		const char *arg = (*env)->GetStringUTFChars(env, commandLineParams, &iscopy);

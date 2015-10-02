@@ -43,6 +43,8 @@ char m_return_reason[128];
 
 extern vec3_t hmdorientation;
 extern int andrw;
+extern char *strGameFolder;
+
 
 extern void jni_setEyeBufferResolution(int resolution);
 extern void jni_SwitchVRMode();
@@ -484,18 +486,28 @@ static void M_Main_Draw (void)
 
 	if (m_missingdata)
 	{
+		//If we are in VR mode, switch out of it
+		if (vrMode) {
+			jni_SwitchVRMode();
+			vrMode = false;
+			showfps.integer = 0;
+		}
+
 		float y;
 		const char *s;
 		M_Background(640, 480); //fall back is always to 640x480, this makes it most readable at that.
 		y = 480/3-16;
-		s = "You have reached this menu due to missing or unlocatable content/data";M_PrintRed ((640-strlen(s)*8)*0.5, (480/3)-16, s);y+=8;
+		s = "You have reached this menu due to missing or unlocatable content/data";
+		M_PrintRed ((640-strlen(s)*8)*0.5, (480/3)-16, s);y+=8;
 		y+=8;
-		s = "You may consider adding";M_Print ((640-strlen(s)*8)*0.5, y, s);y+=8;
-		s = "-basedir /path/to/game";M_Print ((640-strlen(s)*8)*0.5, y, s);y+=8;
-		s = "to your launch commandline";M_Print ((640-strlen(s)*8)*0.5, y, s);y+=8;
-		M_Print (640/2 - 48, 480/2, "Open Console"); //The console usually better shows errors (failures)
-		M_Print (640/2 - 48, 480/2 + 8, "Quit");
-		M_DrawCharacter(640/2 - 56, 480/2 + (8 * m_main_cursor), 12+((int)(realtime*4)&1));
+		s = "Please copy the PAK files from the fullgame or";M_Print (100, y, s);y+=8;
+		s = "shareware version (which you can download for free from";M_Print (100, y, s);y+=8;
+		s = "the following location: http://bit.ly/1PTsnsb )";M_Print (100, y, s);y+=8;
+		s = "to the following folder on your device:";M_Print (100, y, s);y+=16;
+		char buffer[1024];
+		s = va(buffer, 1024, "%s/id1", strGameFolder);M_Print (100, y, s);y+=8;
+		M_Print (640/2 - 48, 480/2 + 8, "Tap Screen to Quit");
+		M_DrawCharacter(640/2 - 86, 480/2 + 8, 12+((int)(realtime*4)&1));
 		return;
 	}
 
@@ -578,20 +590,9 @@ static void M_Main_Key (int key, int ascii)
 
 		if (m_missingdata)
 		{
-			switch (m_main_cursor)
-			{
-			case 0:
-				if (cls.state == ca_connected)
-				{
-					m_state = m_none;
-					key_dest = key_game;
-				}
-				Con_ToggleConsole_f ();
-				break;
-			case 1:
-				M_Menu_Quit_f ();
-				break;
-			}
+			Host_Quit_f ();
+			key_dest = key_game;
+			m_state = m_none;
 		}
 		else if (gamemode == GAME_NEHAHRA)
 		{
@@ -3467,12 +3468,6 @@ static int M_QuitMessage(const char *line1, const char *line2, const char *line3
 
 static int M_ChooseQuitMessage(int request)
 {
-	if (m_missingdata)
-	{
-		// frag related quit messages are pointless for a fallback menu, so use something generic
-		if (request-- == 0) return M_QuitMessage("Are you sure you want to quit?","Press Y to quit, N to stay",NULL,NULL,NULL,NULL,NULL,NULL);
-		return 0;
-	}
 	switch (gamemode)
 	{
 	case GAME_NORMAL:
