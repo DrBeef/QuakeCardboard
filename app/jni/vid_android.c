@@ -484,17 +484,24 @@ void QC_MotionEvent(float delta, float dx, float dy)
 {
 	static bool canAdjust = true;
 
+	//Pitch lock?
+	if (cl_pitchmode.integer != 0 || !vrMode) {
+		if (cl_pitchmode.integer == 1)
+			delta *= -1.0f;
+
+		in_mouse_y += (dy * delta);
+		in_windowmouse_y += (dy * delta);
+		if (in_windowmouse_y < 0) in_windowmouse_y = 0;
+		if (in_windowmouse_y > andrh - 1) in_windowmouse_y = andrh - 1;
+	}
+
 	//If not in vr mode, then always use yaw stick control
 	if (cl_yawmode.integer == 2 || !vrMode)
 	{
 		in_mouse_x+=(dx*delta);
-		in_mouse_y+=(dy*delta);
 		in_windowmouse_x += (dx*delta);
 		if (in_windowmouse_x<0) in_windowmouse_x=0;
 		if (in_windowmouse_x>andrw-1) in_windowmouse_x=andrw-1;
-		in_windowmouse_y += (dy*delta);
-		if (in_windowmouse_y<0) in_windowmouse_y=0;
-		if (in_windowmouse_y>andrh-1) in_windowmouse_y=andrh-1;
 	}
 	else if (cl_yawmode.integer == 1) {
 		if (fabs(dx) > 0.4 && canAdjust && delta != -1.0f) {
@@ -519,7 +526,7 @@ void QC_MotionEvent(float delta, float dx, float dy)
 }
 
 static struct {
-	float pitch, yaw, previous_yaw, roll;
+	float pitch, previous_pitch, yaw, previous_yaw, roll;
 } move_event;
 
 
@@ -528,8 +535,16 @@ void IN_Move(void)
 	bool ignorePitch = move_event.pitch == 0.0f &&
 			move_event.yaw == 0.0f &&
 			move_event.roll == 0.0f;
-	if (!ignorePitch)
-		cl.viewangles[PITCH] = move_event.pitch;
+
+	if (!ignorePitch) {
+		if (cl_pitchmode.integer == 0)
+			cl.viewangles[PITCH] = move_event.pitch;
+		else {
+			cl.viewangles[PITCH] -= move_event.previous_pitch;
+			cl.viewangles[PITCH] += move_event.pitch;
+		}
+	}
+
 	if (cl_yawmode.integer != 1)
 		cl.viewangles[YAW] -= move_event.previous_yaw;
 	cl.viewangles[YAW] += move_event.yaw ;
@@ -539,6 +554,7 @@ void IN_Move(void)
 void QC_MoveEvent(float yaw, float pitch, float roll)
 {
 	move_event.previous_yaw = move_event.yaw;
+	move_event.previous_pitch = move_event.pitch;
 	move_event.yaw = yaw;
 	move_event.pitch = pitch;
 	move_event.roll = roll;

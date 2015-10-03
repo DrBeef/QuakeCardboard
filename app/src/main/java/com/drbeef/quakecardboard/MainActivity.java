@@ -632,14 +632,10 @@ public class MainActivity
                 QuakeJNILib.onTouchEvent( source, action, x, y );
 
                 float z = getCenteredAxis(event, MotionEvent.AXIS_Z);
-                float rz = 0.0f;
-                if (!cardboardView.getVRMode())
-                    rz = -getCenteredAxis(event, MotionEvent.AXIS_RZ);
+                float rz = -getCenteredAxis(event, MotionEvent.AXIS_RZ);
                 //For the samsung game pad (uses different axes for the second stick)
                 float rx = getCenteredAxis(event, MotionEvent.AXIS_RX);
-                float ry = 0.0f;
-                if (!cardboardView.getVRMode())
-                    ry = -getCenteredAxis(event, MotionEvent.AXIS_RY);
+                float ry = -getCenteredAxis(event, MotionEvent.AXIS_RY);
 
                 //let's figure it out
                 if (gamepadType == 0)
