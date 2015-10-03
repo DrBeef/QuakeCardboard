@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mprogdefs.h"
 
-#define QC_VERSION  "1.1"
+#define QC_VERSION  "1.2"
 
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
