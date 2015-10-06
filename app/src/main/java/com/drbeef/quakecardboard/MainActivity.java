@@ -64,6 +64,9 @@ public class MainActivity
     //This is set when the user opts to use a different resolution to the one picked as the default
     int desiredEyeBufferResolution = -1;
 
+    //-1 means escape key isn't pressed
+    private long escapeKeyDownCounter = -1;
+
     private Vibrator vibrator;
     private float M_PI = 3.14159265358979323846f;
     public static AudioCallback mAudio;
@@ -573,6 +576,31 @@ public class MainActivity
         if ( action == KeyEvent.ACTION_UP )
         {
             Log.v( TAG, "GLES3JNIActivity::dispatchKeyEvent( " + keyCode + ", " + action + " )" );
+        }
+
+        //Allow user to switch vr mode by holding the select button down
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_START)
+        {
+            if (action == KeyEvent.ACTION_DOWN &&
+                    escapeKeyDownCounter == -1)
+            {
+                escapeKeyDownCounter = System.currentTimeMillis();
+
+            }
+            else if (action == KeyEvent.ACTION_UP)
+            {
+                escapeKeyDownCounter = -1;
+            }
+        }
+
+        if (escapeKeyDownCounter != -1)
+        {
+            if ((System.currentTimeMillis() - escapeKeyDownCounter) > 2000)
+            {
+                //Switch VR mode
+                escapeKeyDownCounter = -1;
+                SwitchVRMode();
+            }
         }
 
         //Following buttons must not be handled here
