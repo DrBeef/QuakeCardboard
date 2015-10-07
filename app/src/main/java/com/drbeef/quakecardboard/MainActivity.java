@@ -600,6 +600,8 @@ public class MainActivity
                 //Switch VR mode
                 escapeKeyDownCounter = -1;
                 SwitchVRMode();
+                //Now make sure quake is aware!
+                QuakeJNILib.onSwitchVRMode();
             }
         }
 

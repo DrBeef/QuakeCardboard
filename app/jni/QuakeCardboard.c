@@ -24,6 +24,7 @@ extern void QC_Analog(int enable,float x,float y);
 extern void QC_MotionEvent(float delta, float dx, float dy);
 extern int main (int argc, char **argv);
 
+extern qboolean vrMode;
 
 static JavaVM *jVM;
 static jobject audioBuffer=0;
@@ -342,6 +343,11 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onDrawEye( JNI
 JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onFinishFrame( JNIEnv * env, jobject obj )
 {
 	QC_EndFrame();
+}
+
+JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onSwitchVRMode( JNIEnv * env, jobject obj )
+{
+	vrMode = !vrMode;
 }
 
 JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onKeyEvent( JNIEnv * env, jobject obj, int keyCode, int action, int character )

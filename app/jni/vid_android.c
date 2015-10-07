@@ -486,11 +486,13 @@ void QC_MotionEvent(float delta, float dx, float dy)
 
 	//Pitch lock?
 	if (cl_pitchmode.integer != 0 || !vrMode) {
-		if (cl_pitchmode.integer == 1)
-			delta *= -1.0f;
 
-		in_mouse_y += (dy * delta);
-		in_windowmouse_y += (dy * delta);
+		float dir = 1.0f;
+		if (cl_pitchmode.integer == 1)
+			dir = -1.0f;
+
+		in_mouse_y += (dy * delta * dir);
+		in_windowmouse_y += (dy * delta * dir);
 		if (in_windowmouse_y < 0) in_windowmouse_y = 0;
 		if (in_windowmouse_y > andrh - 1) in_windowmouse_y = andrh - 1;
 	}
@@ -532,17 +534,12 @@ static struct {
 
 void IN_Move(void)
 {
-	bool ignorePitch = move_event.pitch == 0.0f &&
-			move_event.yaw == 0.0f &&
-			move_event.roll == 0.0f;
-
-	if (!ignorePitch) {
-		if (cl_pitchmode.integer == 0)
-			cl.viewangles[PITCH] = move_event.pitch;
-		else {
-			cl.viewangles[PITCH] -= move_event.previous_pitch;
-			cl.viewangles[PITCH] += move_event.pitch;
-		}
+	if (cl_pitchmode.integer != 0 || !vrMode) {
+		cl.viewangles[PITCH] -= move_event.previous_pitch;
+		cl.viewangles[PITCH] += move_event.pitch;
+	}
+	else {
+		cl.viewangles[PITCH] = move_event.pitch;
 	}
 
 	if (cl_yawmode.integer != 1)

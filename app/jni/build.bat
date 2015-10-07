@@ -13,7 +13,7 @@ REM Create an archive of the source
 cd ..\src\main\assets\source
 del QuakeCardboardSource.zip
 REM exclude unnecessary files from build
-7z a -r -x!.git* -x!*.o -x!*.d -x!obj -x!*.bin -x!app\build -x!app\libs -x!*.jar -x!*.so -x!*.log -x!*.jks QuakeCardboardSource.zip ..\..\..\..\..\*
+7z a -r -x!.git* -x!*.o -x!*.d -x!obj -x!*.bin -x!app\build -x!app\libs -x!*.jar -x!*.so -x!*.log -x!*.jks -x!*.apk QuakeCardboardSource.zip ..\..\..\..\..\*
 
 
 cd ..\..\..\..\jni
