@@ -1,16 +1,12 @@
 package com.drbeef.quakecardboard;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.PixelFormat;
-import android.opengl.GLES10;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
-import android.opengl.GLSurfaceView;
 import android.opengl.GLUtils;
 import android.opengl.Matrix;
 import android.os.Build;
@@ -28,7 +24,6 @@ import com.google.vrtoolkit.cardboard.CardboardActivity;
 import com.google.vrtoolkit.cardboard.CardboardView;
 import com.google.vrtoolkit.cardboard.Eye;
 import com.google.vrtoolkit.cardboard.HeadTransform;
-import com.google.vrtoolkit.cardboard.ScreenParams;
 import com.google.vrtoolkit.cardboard.Viewport;
 
 import java.io.BufferedReader;
@@ -46,7 +41,6 @@ import java.nio.FloatBuffer;
 import java.nio.ShortBuffer;
 
 import javax.microedition.khronos.egl.EGLConfig;
-import javax.microedition.khronos.opengles.GL10;
 
 
 public class MainActivity
@@ -64,8 +58,8 @@ public class MainActivity
     //This is set when the user opts to use a different resolution to the one picked as the default
     int desiredEyeBufferResolution = -1;
 
-    //-1 means escape key isn't pressed
-    private long escapeKeyDownCounter = -1;
+    //-1 means start button isn't pressed
+    private long startButtonDownCounter = -1;
 
     private Vibrator vibrator;
     private float M_PI = 3.14159265358979323846f;
@@ -578,27 +572,27 @@ public class MainActivity
             Log.v( TAG, "GLES3JNIActivity::dispatchKeyEvent( " + keyCode + ", " + action + " )" );
         }
 
-        //Allow user to switch vr mode by holding the select button down
+        //Allow user to switch vr mode by holding the start button down
         if (keyCode == KeyEvent.KEYCODE_BUTTON_START)
         {
             if (action == KeyEvent.ACTION_DOWN &&
-                    escapeKeyDownCounter == -1)
+                    startButtonDownCounter == -1)
             {
-                escapeKeyDownCounter = System.currentTimeMillis();
+                startButtonDownCounter = System.currentTimeMillis();
 
             }
             else if (action == KeyEvent.ACTION_UP)
             {
-                escapeKeyDownCounter = -1;
+                startButtonDownCounter = -1;
             }
         }
 
-        if (escapeKeyDownCounter != -1)
+        if (startButtonDownCounter != -1)
         {
-            if ((System.currentTimeMillis() - escapeKeyDownCounter) > 2000)
+            if ((System.currentTimeMillis() - startButtonDownCounter) > 2000)
             {
                 //Switch VR mode
-                escapeKeyDownCounter = -1;
+                startButtonDownCounter = -1;
                 SwitchVRMode();
                 //Now make sure quake is aware!
                 QuakeJNILib.onSwitchVRMode();
