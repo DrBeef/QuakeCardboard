@@ -552,8 +552,8 @@ void QC_MoveEvent(float yaw, float pitch, float roll)
 {
 	move_event.previous_yaw = move_event.yaw;
 	move_event.previous_pitch = move_event.pitch;
-	move_event.yaw = yaw;
-	move_event.pitch = pitch;
+	move_event.yaw = yaw * cl_yawmult.value;
+	move_event.pitch = pitch * cl_pitchmult.value;
 	move_event.roll = roll;
 }
 

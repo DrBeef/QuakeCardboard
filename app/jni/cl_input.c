@@ -441,6 +441,8 @@ cvar_t cl_pitchmode = {CVAR_SAVE, "cl_pitchmode","0","0 = locked to hmd, 1 = fre
 cvar_t cl_comfort = {CVAR_SAVE, "cl_comfort","45.0","angle by which comfort mode adjusts yaw"};
 cvar_t cl_yawspeed = {CVAR_SAVE, "cl_yawspeed","150","keyboard yaw turning speed"};
 cvar_t cl_pitchspeed = {CVAR_SAVE, "cl_pitchspeed","150","keyboard pitch turning speed"};
+cvar_t cl_yawmult = {CVAR_SAVE, "cl_yawmult","1.0","Multiplier for yaw (leave at 1.0)"};
+cvar_t cl_pitchmult = {CVAR_SAVE, "cl_pitchmult","1.0","Multiplier for yaw (leave at 1.0)"};
 
 cvar_t cl_anglespeedkey = {CVAR_SAVE, "cl_anglespeedkey","1.5","how much +speed multiplies keyboard turning speed"};
 
@@ -2250,6 +2252,8 @@ void CL_InitInput (void)
 	Cvar_RegisterVariable(&cl_pitchmode);
 	Cvar_RegisterVariable(&cl_comfort);
 	Cvar_RegisterVariable(&cl_yawspeed);
+	Cvar_RegisterVariable(&cl_pitchmult);
+	Cvar_RegisterVariable(&cl_yawmult);
 
 	Cvar_RegisterVariable(&cl_movecliptokeyboard);
 	Cvar_RegisterVariable(&cl_movement);
