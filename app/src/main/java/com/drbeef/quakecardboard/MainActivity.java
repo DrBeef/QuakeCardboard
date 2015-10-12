@@ -270,7 +270,7 @@ public class MainActivity
 
         setContentView(R.layout.activity_main);
         cardboardView = (CardboardView) findViewById(R.id.cardboard_view);
-        cardboardView.setEGLConfigChooser(new QuakeEGLConfigChooser());
+        cardboardView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
         cardboardView.setRenderer(this);
         setCardboardView(cardboardView);
 
