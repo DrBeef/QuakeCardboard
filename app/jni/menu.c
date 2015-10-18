@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mprogdefs.h"
 
-#define QC_VERSION  "1.2.3"
+#define QC_VERSION  "1.2.4"
 
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
@@ -2860,7 +2860,7 @@ static void M_Reset_Draw (void)
 	M_Print(8 + 4 * (linelength - 11), 16, "Press y / n");
 }
 
-#define	YAWCONTROL_ITEMS	4
+#define	YAWCONTROL_ITEMS	5
 
 static int yawpitchcontrol_cursor;
 
@@ -2879,6 +2879,7 @@ static void M_Menu_YawPitchControl_AdjustSliders (int dir)
 	optnum = 0;
 
 	     if (yawpitchcontrol_cursor == optnum++) ;
+	else if (yawpitchcontrol_cursor == optnum++) ;
 	else if (yawpitchcontrol_cursor == optnum++) ;
 	else if (yawpitchcontrol_cursor == optnum++ && cl_yawmode.integer == 1)
 		{
@@ -2940,12 +2941,17 @@ static void M_Menu_YawPitchControl_Key (int key, int ascii)
 	case K_LEFTARROW:
 		if (yawpitchcontrol_cursor == 0)
 		{
+			int newVal = 1 - cl_2dheadtracking.integer;
+			Cvar_SetValueQuick (&cl_2dheadtracking, newVal);
+		}
+		else if (yawpitchcontrol_cursor == 1)
+		{
 			int newPitchMode = cl_pitchmode.integer;
 			if (--newPitchMode < 0)
 				newPitchMode = 2;
 			Cvar_SetValueQuick (&cl_pitchmode, newPitchMode);
 		}
-		else if (yawpitchcontrol_cursor == 1)
+		else if (yawpitchcontrol_cursor == 2)
 		{
 			int newYawMode = cl_yawmode.integer;
 			if (--newYawMode < 0)
@@ -2961,12 +2967,17 @@ static void M_Menu_YawPitchControl_Key (int key, int ascii)
 	case K_RIGHTARROW:
 		if (yawpitchcontrol_cursor == 0)
 		{
+			int newVal = 1 - cl_2dheadtracking.integer;
+			Cvar_SetValueQuick (&cl_2dheadtracking, newVal);
+		}
+		else if (yawpitchcontrol_cursor == 1)
+		{
 			int newPitchMode = cl_pitchmode.integer;
 			if (++newPitchMode > 2)
 				newPitchMode = 0;
 			Cvar_SetValueQuick (&cl_pitchmode, newPitchMode);
 		}
-		if (yawpitchcontrol_cursor == 1)
+		else if (yawpitchcontrol_cursor == 2)
 		{
 			int newYawMode = cl_yawmode.integer;
 			if (++newYawMode > 2)
@@ -2999,19 +3010,24 @@ static void M_Menu_YawPitchControl_Draw (void)
 	visible = (int)((menu_height - 32) / 8);
 	opty = 32 - bound(0, optcursor - (visible >> 1), max(0, YAWCONTROL_ITEMS - visible)) * 8;
 
+	if (cl_2dheadtracking.integer == 0)
+		M_Options_PrintCommand(" Non-VR Headtracking: Disabled", !vrMode);
+	else
+		M_Options_PrintCommand(" Non-VR Headtracking:  Enabled", !vrMode);
+
 	if (cl_pitchmode.integer == 0)
-		M_Options_PrintCommand("  Pitch Mode: Locked (default)", true);
+		M_Options_PrintCommand(" Pitch Mode:           Locked (default)", true);
 	else if (cl_pitchmode.integer == 1)
-		M_Options_PrintCommand("  Pitch Mode: Free", true);
+		M_Options_PrintCommand(" Pitch Mode:           Free", true);
 	else if (cl_pitchmode.integer == 2)
-		M_Options_PrintCommand("  Pitch Mode: Free (inverted)", true);
+		M_Options_PrintCommand(" Pitch Mode:           Free (inverted)", true);
 
 	if (cl_yawmode.integer == 0)
-		M_Options_PrintCommand("    Yaw Mode: Swivel-Chair/Standing", true);
+		M_Options_PrintCommand("   Yaw Mode:           Swivel-Chair", true);
 	else if (cl_yawmode.integer == 1)
-		M_Options_PrintCommand("    Yaw Mode: Comfort-Mode", true);
+		M_Options_PrintCommand("   Yaw Mode:           Comfort-Mode", true);
 	else
-		M_Options_PrintCommand("    Yaw Mode: Stick-Yaw", true);
+		M_Options_PrintCommand("   Yaw Mode:           Stick-Yaw", true);
 
 	M_Options_PrintSlider(  "Comfort Mode Turn Angle", cl_yawmode.integer == 1, cl_comfort.value, 30, 180);
 	M_Options_PrintSlider(  "   Stick Yaw Turn Speed", cl_yawmode.integer == 2, sensitivity.value, 1, 10);

@@ -10,6 +10,7 @@
 #include <qtypes.h>
 #include <quakedef.h>
 #include <menu.h>
+#include <cvar.h>
 
 //All the functionality we link to in the DarkPlaces Quake implementation
 extern void QC_BeginFrame();
@@ -25,6 +26,8 @@ extern void QC_MotionEvent(float delta, float dx, float dy);
 extern int main (int argc, char **argv);
 
 extern qboolean vrMode;
+
+extern cvar_t cl_2dheadtracking;
 
 static JavaVM *jVM;
 static jobject audioBuffer=0;
@@ -320,9 +323,19 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onNewFrame( JN
 	QC_MotionEvent(delta, last_joystick_x, last_joystick_y);
 
 	//Save orientation
-	hmdorientation[YAW] = yaw;
-	hmdorientation[PITCH] = pitch;
-	hmdorientation[ROLL] = roll;
+	if (vrMode || cl_2dheadtracking.integer == 1)
+	{
+		hmdorientation[YAW] =	yaw;
+		hmdorientation[PITCH] =	pitch;
+		hmdorientation[ROLL] =	roll;
+	}
+	else
+	{
+		hmdorientation[YAW] =	0;
+		hmdorientation[PITCH] =	0;
+		hmdorientation[ROLL] =	0;
+
+	}
 	
 	//Set move information
 	QC_MoveEvent(hmdorientation[YAW], hmdorientation[PITCH], hmdorientation[ROLL]);

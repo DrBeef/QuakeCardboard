@@ -404,13 +404,7 @@ public class MainActivity
             //eulerAngles[offset + 2] = -roll;
             float[] eulerAngles = new float[3];
             headTransform.getEulerAngles(eulerAngles, 0);
-            if (cardboardView.getVRMode())
-                QuakeJNILib.onNewFrame(-eulerAngles[0] / (M_PI / 180.0f), eulerAngles[1] / (M_PI / 180.0f), -eulerAngles[2] / (M_PI / 180.0f));
-            else
-                //Non-vr, look straight ahead
-                QuakeJNILib.onNewFrame(0, 0, 0);
-
-
+            QuakeJNILib.onNewFrame(-eulerAngles[0] / (M_PI / 180.0f), eulerAngles[1] / (M_PI / 180.0f), -eulerAngles[2] / (M_PI / 180.0f));
 
             // Clear our matrices
             for(int i=0;i<16;i++)
