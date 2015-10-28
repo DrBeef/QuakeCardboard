@@ -14,6 +14,7 @@ public class QuakeJNILib {
     public static native void onDrawEye( int eye, int x, int y );
     public static native void onFinishFrame( );
     public static native void onSwitchVRMode( );
+    public static native void onBigScreenMode( int mode );
 
     //Audio
     public static native void requestAudioData();

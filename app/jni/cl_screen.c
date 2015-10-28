@@ -112,6 +112,9 @@ int			scr_con_margin_bottom;
 
 extern int	con_vislines;
 
+extern void jni_BigScreenMode(int mode);
+
+
 static void SCR_ScreenShot_f (void);
 static void R_Envmap_f (void);
 
@@ -708,11 +711,15 @@ void SCR_DrawConsole (void)
 	{
 		// full screen
 		Con_DrawConsole (vid_conheight.integer - scr_con_margin_bottom);
+		jni_BigScreenMode(1);
 	}
-	else if (scr_con_current)
-		Con_DrawConsole (min((int)scr_con_current, vid_conheight.integer - scr_con_margin_bottom));
-	else
+	else if (scr_con_current) {
+		Con_DrawConsole(min((int) scr_con_current, vid_conheight.integer - scr_con_margin_bottom));
+		jni_BigScreenMode(1);
+	}
+	else {
 		con_vislines = 0;
+	}
 }
 
 /*

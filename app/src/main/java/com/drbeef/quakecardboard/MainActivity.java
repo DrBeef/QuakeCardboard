@@ -3,11 +3,8 @@ package com.drbeef.quakecardboard;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.content.res.AssetManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
-import android.opengl.GLUtils;
 import android.opengl.Matrix;
 import android.os.Build;
 import android.os.Bundle;
@@ -45,7 +42,7 @@ import javax.microedition.khronos.egl.EGLConfig;
 
 public class MainActivity
         extends CardboardActivity
-        implements CardboardView.Renderer, QuakeCallback
+        implements CardboardView.StereoRenderer, QuakeCallback
 {
     int[] texturenames = new int[1];
 
@@ -58,6 +55,15 @@ public class MainActivity
     //This is set when the user opts to use a different resolution to the one picked as the default
     int desiredEyeBufferResolution = -1;
 
+    private float[] eulerAngles = new float[3];
+
+    /**
+     * 0 = no big screen (in game)
+     * 1 = big screen whilst menu or console active
+     * 2 = big screen all the time
+     */
+    private int bigScreen = 1;
+
     //-1 means start button isn't pressed
     private long startButtonDownCounter = -1;
 
@@ -69,24 +75,49 @@ public class MainActivity
 
     private CardboardView cardboardView;
 
+    private FloatBuffer screenVertices;
+
+    private int positionParam;
+    private int texCoordParam;
+    private int samplerParam;
+    private int modelViewProjectionParam;
+
+    private float[] modelScreen;
+    private float[] camera;
+    private float[] view;
+    private float[] modelViewProjection;
+    private float[] modelView;
+    private float[] mOrthoProjection = new float[16];
+    private float[] mOrthoProjectionAndView = new float[16];
+
+    private float screenDistance = 8f;
+    private float screenScale = 4f;
+
     public static final String vs_Image =
-            "uniform mat4 uMVPMatrix;" +
-            "attribute vec4 vPosition;" +
+            "uniform mat4 u_MVPMatrix;" +
+            "attribute vec4 a_Position;" +
             "attribute vec2 a_texCoord;" +
             "varying vec2 v_texCoord;" +
             "void main() {" +
-            "  gl_Position = uMVPMatrix * vPosition;" +
+            "  gl_Position = u_MVPMatrix * a_Position;" +
             "  v_texCoord = a_texCoord;" +
             "}";
 
+
     public static final String fs_Image =
             "precision mediump float;" +
-                    "varying vec2 v_texCoord;" +
-                    "uniform sampler2D s_texture;" +
-                    "void main() {" +
-                    "  gl_FragColor = texture2D( s_texture, v_texCoord );" +
-                    "}";
+            "varying vec2 v_texCoord;" +
+            "uniform sampler2D s_texture;" +
+            "void main() {" +
+            "  gl_FragColor = texture2D( s_texture, v_texCoord );" +
+            "}";
 
+    public static final float[] SCREEN_COORDS = new float[] {
+            -1.3f, 1.0f, 1.0f,
+            -1.3f, -1.0f, 1.0f,
+            1.3f, -1.0f, 1.0f,
+            1.3f, 1.0f, 1.0f
+    };
 
     public static int loadShader(int type, String shaderCode){
         int shader = GLES20.glCreateShader(type);
@@ -102,21 +133,15 @@ public class MainActivity
     int mWidth = 0;
     int mHeight = 0;
 
-    private int mPositionHandle;
-    private int mTexCoordLoc;
-
-    // Our matrices
-    private final float[] mtrxProjection = new float[16];
-    private final float[] mtrxView = new float[16];
-    private final float[] mtrxProjectionAndView = new float[16];
-
     // Geometric variables
     public static float vertices[];
-    public static short indices[];
+    public static short[] indices = new short[] {0, 1, 2, 0, 2, 3};
     public static float uvs[];
     public FloatBuffer vertexBuffer;
     public ShortBuffer drawListBuffer;
     public FloatBuffer uvBuffer;
+
+    //Shader Program
     public static int sp_Image;
 
     private String sdcard = Environment.getExternalStorageDirectory().getPath();
@@ -274,15 +299,17 @@ public class MainActivity
         cardboardView.setRenderer(this);
         setCardboardView(cardboardView);
 
-        //cardboardView.setVRModeEnabled(false);
 
-         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        modelScreen = new float[16];
+        camera = new float[16];
+        view = new float[16];
+        modelViewProjection = new float[16];
+        modelView = new float[16];
+
+        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
         //At the very least ensure we have a directory containing a config file
         copy_asset("config.cfg");
-
-        //Not currently distributing the shareware version
-        //copy_asset("pak0.pak");
 
         //Create the FBOs
         fbo = new QuakeFBO();
@@ -336,6 +363,19 @@ public class MainActivity
     public void onSurfaceCreated(EGLConfig config) {
          Log.i(TAG, "onSurfaceCreated");
 
+        ByteBuffer bbVertices = ByteBuffer.allocateDirect(SCREEN_COORDS.length * 4);
+        bbVertices.order(ByteOrder.nativeOrder());
+        screenVertices = bbVertices.asFloatBuffer();
+        screenVertices.put(SCREEN_COORDS);
+        screenVertices.position(0);
+
+        // initialize byte buffer for the draw list
+        ByteBuffer dlb = ByteBuffer.allocateDirect(indices.length * 2);
+        dlb.order(ByteOrder.nativeOrder());
+        drawListBuffer = dlb.asShortBuffer();
+        drawListBuffer.put(indices);
+        drawListBuffer.position(0);
+
          // Create the shaders, images
          int vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vs_Image);
          int fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fs_Image);
@@ -344,7 +384,32 @@ public class MainActivity
          GLES20.glAttachShader(sp_Image, vertexShader);   // add the vertex shader to program
          GLES20.glAttachShader(sp_Image, fragmentShader); // add the fragment shader to program
          GLES20.glLinkProgram(sp_Image);                  // creates OpenGL ES program executable
-     }
+
+        positionParam = GLES20.glGetAttribLocation(sp_Image, "a_Position");
+        texCoordParam = GLES20.glGetAttribLocation(sp_Image, "a_texCoord");
+        modelViewProjectionParam = GLES20.glGetUniformLocation(sp_Image, "u_MVPMatrix");
+        samplerParam = GLES20.glGetUniformLocation(sp_Image, "s_texture");
+
+
+        GLES20.glEnableVertexAttribArray(positionParam);
+        GLES20.glEnableVertexAttribArray(texCoordParam);
+
+        // Build the camera matrix
+        Matrix.setLookAtM(camera, 0, 0.0f, 0.0f, 0.01f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+
+        // Object first appears directly in front of user.
+        Matrix.setIdentityM(modelScreen, 0);
+        Matrix.translateM(modelScreen, 0, 0, 0, -screenDistance);
+        Matrix.scaleM(modelScreen, 0, screenScale, screenScale, 1.0f);
+    }
+
+    public void BigScreenMode(int mode)
+    {
+        if (mode == -1)
+            bigScreen = 1;
+        else if (bigScreen != 2)
+            bigScreen = mode;
+    }
 
     int getDesiredfboEyeResolution(int viewportWidth) {
 
@@ -364,8 +429,15 @@ public class MainActivity
     }
 
     @Override
-    public void onDrawFrame(HeadTransform headTransform, Eye lefteye, Eye righteye) {
+    public void onNewFrame(HeadTransform headTransform) {
+        if (mQuakeInitialised) {
+            headTransform.getEulerAngles(eulerAngles, 0);
+            QuakeJNILib.onNewFrame(-eulerAngles[0] / (M_PI / 180.0f), eulerAngles[1] / (M_PI / 180.0f), -eulerAngles[2] / (M_PI / 180.0f));
+        }
+    }
 
+    @Override
+    public void onDrawEye(Eye eye) {
         if (mVRModeChanged)
         {
             Log.i(TAG, "mVRModeChanged");
@@ -373,14 +445,14 @@ public class MainActivity
                 DestroyFBO(fbo);
 
             if (cardboardView.getVRMode()) {
-                fboEyeResolution = getDesiredfboEyeResolution(lefteye.getViewport().width);
-                CreateFBO(fbo, 0, fboEyeResolution * 2, fboEyeResolution);
+                fboEyeResolution = getDesiredfboEyeResolution(eye.getViewport().width);
+                CreateFBO(fbo, 0, fboEyeResolution, fboEyeResolution);
                 QuakeJNILib.setResolution(fboEyeResolution, fboEyeResolution);
             }
             else
             {
-                CreateFBO(fbo, 0, lefteye.getViewport().width, lefteye.getViewport().height);
-                QuakeJNILib.setResolution(lefteye.getViewport().width, lefteye.getViewport().height);
+                CreateFBO(fbo, 0, eye.getViewport().width, eye.getViewport().height);
+                QuakeJNILib.setResolution(eye.getViewport().width, eye.getViewport().height);
             }
             mVRModeChanged = false;
         }
@@ -399,38 +471,6 @@ public class MainActivity
         }
 
         if (mQuakeInitialised) {
-            //eulerAngles[offset + 0] = -pitch;
-            //eulerAngles[offset + 1] = -yaw;
-            //eulerAngles[offset + 2] = -roll;
-            float[] eulerAngles = new float[3];
-            headTransform.getEulerAngles(eulerAngles, 0);
-            QuakeJNILib.onNewFrame(-eulerAngles[0] / (M_PI / 180.0f), eulerAngles[1] / (M_PI / 180.0f), -eulerAngles[2] / (M_PI / 180.0f));
-
-            // Clear our matrices
-            for(int i=0;i<16;i++)
-            {
-                mtrxProjection[i] = 0.0f;
-                mtrxView[i] = 0.0f;
-                mtrxProjectionAndView[i] = 0.0f;
-            }
-
-            // Create the triangles
-            if (cardboardView.getVRMode()) {
-                SetupTriangle(0, 0, lefteye.getViewport().width * 2, lefteye.getViewport().height);
-                Matrix.orthoM(mtrxProjection, 0, 0, lefteye.getViewport().width * 2, 0, lefteye.getViewport().height, 0, 50);
-            }
-            else
-            {
-                SetupTriangle(0, 0, lefteye.getViewport().width, lefteye.getViewport().height);
-                Matrix.orthoM(mtrxProjection, 0, 0, lefteye.getViewport().width, 0, lefteye.getViewport().height, 0, 50);
-
-            }
-
-            // Set the camera position (View matrix)
-            Matrix.setLookAtM(mtrxView, 0, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1.0f, 0.0f);
-
-            // Calculate the projection and view transformation
-            Matrix.multiplyMM(mtrxProjectionAndView, 0, mtrxProjection, 0, mtrxView, 0);
 
             //Record the curent fbo
             GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, currentFBO, 0);
@@ -442,73 +482,72 @@ public class MainActivity
             GLES20.glEnable(GLES20.GL_SCISSOR_TEST);
 
             if (cardboardView.getVRMode()) {
-                GLES20.glScissor(0, 0, fboEyeResolution * 2, fboEyeResolution);
-            }
-            else  {
-                GLES20.glScissor(0, 0, lefteye.getViewport().width, lefteye.getViewport().height);
+                GLES20.glScissor(0, 0, fboEyeResolution, fboEyeResolution);
+            } else {
+                GLES20.glScissor(0, 0, eye.getViewport().width, eye.getViewport().height);
             }
 
             GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
-            //Hopefully type indicates 0 = left, 1 = right
-            QuakeJNILib.onDrawEye(0, 0, 0);
-
-            //Only draw right eye if we are in VR mode
-            if (cardboardView.getVRMode())
-                QuakeJNILib.onDrawEye(1, fboEyeResolution, 0);
+            //Hopefully type indicates 0 = mono, 1 = left, 2 = right
+            QuakeJNILib.onDrawEye(eye.getType() == 0 ? 0 : eye.getType() - 1, 0, 0);
 
             //Finished rendering to our frame buffer, now draw this to the target framebuffer
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, currentFBO[0]);
 
-            //eye.getViewport().setGLScissor();
             GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
+            GLES20.glViewport(eye.getViewport().x, eye.getViewport().y, eye.getViewport().width, eye.getViewport().height);
 
-            if (cardboardView.getVRMode())
-                GLES20.glViewport(0, 0, lefteye.getViewport().width*2, lefteye.getViewport().height);
-            else
-                GLES20.glViewport(0, 0, lefteye.getViewport().width, lefteye.getViewport().height);
-
-            // Set our shader programm
             GLES20.glUseProgram(sp_Image);
 
-            // get handle to vertex shader's vPosition member
-            mPositionHandle = GLES20.glGetAttribLocation(sp_Image, "vPosition");
+            if ((bigScreen != 0) && cardboardView.getVRMode()) {
+                // Apply the eye transformation to the camera.
+                Matrix.multiplyMM(view, 0, eye.getEyeView(), 0, camera, 0);
 
-            // Enable generic vertex attribute array
-            GLES20.glEnableVertexAttribArray(mPositionHandle);
+                // Build the ModelView and ModelViewProjection matrices
+                // for calculating screen position.
+                float[] perspective = eye.getPerspective(0.1f, 100.0f);
+                Matrix.multiplyMM(modelView, 0, view, 0, modelScreen, 0);
+                Matrix.multiplyMM(modelViewProjection, 0, perspective, 0, modelView, 0);
 
-            // Prepare the triangle coordinate data
-            GLES20.glVertexAttribPointer(mPositionHandle, 3,
-                    GLES20.GL_FLOAT, false, 0, vertexBuffer);
+                // Set the position of the screen
+                GLES20.glVertexAttribPointer(positionParam, 3, GLES20.GL_FLOAT, false, 0, screenVertices);
 
-            // Get handle to texture coordinates location
-            mTexCoordLoc = GLES20.glGetAttribLocation(sp_Image, "a_texCoord" );
+                // Prepare the texturecoordinates
+                GLES20.glVertexAttribPointer(texCoordParam, 2, GLES20.GL_FLOAT, false, 0, uvBuffer);
 
-            // Enable generic vertex attribute array
-            GLES20.glEnableVertexAttribArray(mTexCoordLoc);
+                // Set the ModelViewProjection matrix in the shader.
+                GLES20.glUniformMatrix4fv(modelViewProjectionParam, 1, false, modelViewProjection, 0);
 
-            // Prepare the texturecoordinates
-            GLES20.glVertexAttribPointer(mTexCoordLoc, 2, GLES20.GL_FLOAT,
-                    false, 0, uvBuffer);
+            } else {
 
-            // Get handle to shape's transformation matrix
-            int mtrxhandle = GLES20.glGetUniformLocation(sp_Image, "uMVPMatrix");
+                // Create the triangles for orthographic projection (if required)
+                SetupTriangle(0, 0, eye.getViewport().width, eye.getViewport().height);
 
-            // Apply the projection and view transformation
-            GLES20.glUniformMatrix4fv(mtrxhandle, 1, false, mtrxProjectionAndView, 0);
+                Matrix.orthoM(mOrthoProjection, 0, 0, eye.getViewport().width, 0, eye.getViewport().height, 0, 50);
 
-            // Get handle to textures locations
-            int mSamplerLoc = GLES20.glGetUniformLocation (sp_Image, "s_texture" );
+                // Calculate the projection and view transformation
+                Matrix.multiplyMM(mOrthoProjectionAndView, 0, mOrthoProjection, 0, camera, 0);
+
+                // Prepare the triangle coordinate data
+                GLES20.glVertexAttribPointer(positionParam, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer);
+
+                // Prepare the texturecoordinates
+                GLES20.glVertexAttribPointer(texCoordParam, 2, GLES20.GL_FLOAT, false, 0, uvBuffer);
+
+                // Apply the projection and view transformation
+                GLES20.glUniformMatrix4fv(modelViewProjectionParam, 1, false, mOrthoProjectionAndView, 0);
+            }
 
             // Bind texture to fbo's color texture
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fbo.ColorTexture[0]);
 
             // Set the sampler texture unit to our fbo's color texture
-            GLES20.glUniform1i(mSamplerLoc, 0);
+            GLES20.glUniform1i(samplerParam, 0);
 
-            // Draw the triangle
+            // Draw the triangles
             GLES20.glDrawElements(GLES20.GL_TRIANGLES, indices.length,
                     GLES20.GL_UNSIGNED_SHORT, drawListBuffer);
 
@@ -518,9 +557,6 @@ public class MainActivity
 
             // Disable vertex array
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
-
-            //And flush..
-            GLES20.glFlush();
         }
     }
 
@@ -879,12 +915,6 @@ public class MainActivity
         // Generate Textures, if more needed, alter these numbers.
         GLES20.glGenTextures(1, texturenames, 0);
 
-        // Retrieve our image from resources.
-        int id = getResources().getIdentifier("mipmap/ic_launcher", null, getPackageName());
-
-        // Temporary create a bitmap
-        Bitmap bmp = BitmapFactory.decodeResource(getResources(), id);
-
         // Bind texture to texturename
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texturenames[0]);
@@ -892,13 +922,6 @@ public class MainActivity
         // Set filtering
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
-
-        // Load the bitmap into the bound texture.
-        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0);
-
-        // We are done using the bitmap so we should recycle it.
-        bmp.recycle();
-
     }
 
     public void SetupTriangle(int x, int y, int width, int height)
@@ -911,7 +934,6 @@ public class MainActivity
                         x + width, y, 0.0f,
                         x + width, y + height, 0.0f,
                 };
-        indices = new short[] {0, 1, 2, 0, 2, 3}; // The order of vertexrendering.
 
         // The vertex buffer.
         ByteBuffer bb = ByteBuffer.allocateDirect(vertices.length * 4);
@@ -919,13 +941,6 @@ public class MainActivity
         vertexBuffer = bb.asFloatBuffer();
         vertexBuffer.put(vertices);
         vertexBuffer.position(0);
-
-        // initialize byte buffer for the draw list
-        ByteBuffer dlb = ByteBuffer.allocateDirect(indices.length * 2);
-        dlb.order(ByteOrder.nativeOrder());
-        drawListBuffer = dlb.asShortBuffer();
-        drawListBuffer.put(indices);
-        drawListBuffer.position(0);
     }
 
     @Override

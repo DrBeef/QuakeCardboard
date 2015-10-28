@@ -498,7 +498,7 @@ void QC_MotionEvent(float delta, float dx, float dy)
 	}
 
 	//If not in vr mode, then always use yaw stick control
-	if (cl_yawmode.integer == 2 || !vrMode)
+	if (cl_yawmode.integer == 2)
 	{
 		in_mouse_x+=(dx*delta);
 		in_windowmouse_x += (dx*delta);
@@ -534,7 +534,7 @@ static struct {
 
 void IN_Move(void)
 {
-	if (cl_pitchmode.integer != 0 || !vrMode) {
+	if (cl_pitchmode.integer != 0) {
 		cl.viewangles[PITCH] -= move_event.previous_pitch;
 		cl.viewangles[PITCH] += move_event.pitch;
 	}

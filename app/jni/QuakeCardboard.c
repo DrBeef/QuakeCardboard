@@ -26,8 +26,9 @@ extern void QC_MotionEvent(float delta, float dx, float dy);
 extern int main (int argc, char **argv);
 
 extern qboolean vrMode;
+extern int bigScreen;
 
-extern cvar_t cl_2dheadtracking;
+extern cvar_t cl_headtracking;
 
 static JavaVM *jVM;
 static jobject audioBuffer=0;
@@ -40,6 +41,7 @@ jmethodID android_resumeAudio;
 jmethodID android_terminateAudio;
 
 static jobject quakeCallbackObj=0;
+jmethodID android_BigScreenMode;
 jmethodID android_SwitchVRMode;
 jmethodID android_SetEyeBufferResolution;
 jmethodID android_Exit;
@@ -99,9 +101,24 @@ void jni_terminateAudio()
 }
 
 
+void jni_BigScreenMode(int mode)
+{
+	if (audioBuffer==0) return;
+	JNIEnv *env;
+	if (((*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4))<0)
+	{
+		(*jVM)->AttachCurrentThread(jVM,&env, NULL);
+	}
+	(*env)->CallVoidMethod(env, quakeCallbackObj, android_BigScreenMode, mode);
+}
+
 
 void jni_SwitchVRMode()
 {
+	//Force headtracking on / off depending on whether we are using VR mode
+	//user must then change to their preference
+	Cvar_SetValueQuick (&cl_headtracking, vrMode ? 1 : 0);
+
 	JNIEnv *env;
 	jobject tmp;
 	(*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4);
@@ -302,7 +319,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_initialise( JN
 			main(argc, argv);
 		}
 
-		//Start game with game menu active
+		//Start game with credits active
 		MR_ToggleMenu(1);
 		quake_initialised = true;
 	}
@@ -323,7 +340,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onNewFrame( JN
 	QC_MotionEvent(delta, last_joystick_x, last_joystick_y);
 
 	//Save orientation
-	if (vrMode || cl_2dheadtracking.integer == 1)
+	if (cl_headtracking.integer == 1)
 	{
 		hmdorientation[YAW] =	yaw;
 		hmdorientation[PITCH] =	pitch;
@@ -361,6 +378,11 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onFinishFrame(
 JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onSwitchVRMode( JNIEnv * env, jobject obj )
 {
 	vrMode = !vrMode;
+}
+
+JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onBigScreenMode( JNIEnv * env, jobject obj, int mode )
+{
+	bigScreen = mode;
 }
 
 JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onKeyEvent( JNIEnv * env, jobject obj, int keyCode, int action, int character )
@@ -407,6 +429,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setCallbackObj
 	quakeCallbackObj = (jobject)(*env)->NewGlobalRef(env, obj2);
 	quakeCallbackClass = (*env)->GetObjectClass(env, quakeCallbackObj);
 
+	android_BigScreenMode = (*env)->GetMethodID(env,quakeCallbackClass,"BigScreenMode","(I)V");
 	android_SwitchVRMode = (*env)->GetMethodID(env,quakeCallbackClass,"SwitchVRMode","()V");
 	android_SetEyeBufferResolution = (*env)->GetMethodID(env,quakeCallbackClass,"SetEyeBufferResolution","(I)V");
 	android_Exit = (*env)->GetMethodID(env,quakeCallbackClass,"Exit","()V");

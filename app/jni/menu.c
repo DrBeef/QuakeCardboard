@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mprogdefs.h"
 
-#define QC_VERSION  "1.2.4"
+#define QC_VERSION  "1.3.0"
 
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
@@ -37,6 +37,7 @@ static int NehGameType;
 
 //Game always starts in vr mode
 qboolean vrMode = true;
+int bigScreen = 1;
 
 enum m_state_e m_state = m_main;
 char m_return_reason[128];
@@ -48,26 +49,10 @@ extern char *strGameFolder;
 
 extern void jni_setEyeBufferResolution(int resolution);
 extern void jni_SwitchVRMode();
-
-//Calculate the y-offset of the status bar dependent on where the user is looking
-int Menu_GetYOffset()
-{
-	if (!vrMode)
-		return 0;
-
-	return ((vid_conheight.value * 0.5) * ((hmdorientation[PITCH]) / -90.0f)) + 80;
-}
+extern void jni_BigScreenMode(int mode);
 
 //Record yaw at the moment the menu is invoked
 static float hmdYaw = 0;
-int Menu_GetXOffset()
-{
-	if (!vrMode)
-		return 0;
-
-	return (r_stereo_side ? -20 : 20);// + yaw;
-}
-
 
 void M_Menu_Main_f (void);
 	void M_Menu_SinglePlayer_f (void);
@@ -206,8 +191,8 @@ static void M_Background(int width, int height)
 {
 	menu_width = bound(1.0f, (float)width, vid_conwidth.value);
 	menu_height = bound(1.0f, (float)height, vid_conheight.value);
-	menu_x = (vid_conwidth.integer - menu_width) * 0.5 + Menu_GetXOffset();
-	menu_y = (vid_conheight.integer - menu_height) * 0.5 + Menu_GetYOffset();
+	menu_x = (vid_conwidth.integer - menu_width) * 0.5;
+	menu_y = (vid_conheight.integer - menu_height) * 0.5;
 
 	//Make the background barely visible when menu active.. this should avoid people
 	//throwing up while the demo is running!
@@ -330,6 +315,8 @@ static void M_ToggleMenu(int mode)
 		else
 			//These are only shown at the start of the game
 			M_Menu_Credits_f();
+
+		jni_BigScreenMode(1);
 	}
 	else
 	{
@@ -337,6 +324,7 @@ static void M_ToggleMenu(int mode)
 			return; // the menu is on, and we want it on
 		key_dest = key_game;
 		m_state = m_none;
+		jni_BigScreenMode(0);
 	}
 }
 
@@ -475,6 +463,7 @@ void M_Menu_Main_f (void)
 	key_dest = key_menu;
 	m_state = m_main;
 	m_entersound = true;
+	jni_BigScreenMode(1);
 }
 
 
@@ -488,8 +477,8 @@ static void M_Main_Draw (void)
 	{
 		//If we are in VR mode, switch out of it
 		if (vrMode) {
-			jni_SwitchVRMode();
 			vrMode = false;
+			jni_SwitchVRMode();
 			showfps.integer = 0;
 		}
 
@@ -568,6 +557,7 @@ static void M_Main_Key (int key, int ascii)
 	case K_ESCAPE:
 		key_dest = key_game;
 		m_state = m_none;
+		jni_BigScreenMode(0);
 		//cls.demonum = m_save_demonum;
 		//if (cls.demonum != -1 && !cls.demoplayback && cls.state != ca_connected)
 		//	CL_NextDemo ();
@@ -1028,6 +1018,7 @@ static void M_Load_Key (int k, int ascii)
 			return;
 		m_state = m_none;
 		key_dest = key_game;
+		jni_BigScreenMode(0);
 
 		// issue the load command
 		Cbuf_AddText (va(vabuf, sizeof(vabuf), "load s%i\n", load_cursor) );
@@ -1069,6 +1060,7 @@ static void M_Save_Key (int k, int ascii)
 	case K_ENTER:
 		m_state = m_none;
 		key_dest = key_game;
+		jni_BigScreenMode(0);
 		Cbuf_AddText (va(vabuf, sizeof(vabuf), "save s%i\n", load_cursor));
 		return;
 
@@ -1657,7 +1649,11 @@ static void M_Menu_Options_AdjustSliders (int dir)
 	S_LocalSound ("sound/misc/menu3.wav");
 
 	optnum = 0;
-	     if (options_cursor == optnum++) ;
+	if (options_cursor == optnum++) {
+		bigScreen = (bigScreen == 2 ? -1 : 2);
+		jni_BigScreenMode(bigScreen);
+	}
+	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++)
@@ -1695,13 +1691,11 @@ static void M_Menu_Options_AdjustSliders (int dir)
 		}
 	}
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&showfps, !showfps.integer);
-//	else if (options_cursor == optnum++) {f = !(showdate.integer && showtime.integer);Cvar_SetValueQuick(&showdate, f);Cvar_SetValueQuick(&showtime, f);}
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&r_hdr_scenebrightness, bound(1, r_hdr_scenebrightness.value + dir * 0.0625, 4));
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&v_contrast, bound(1, v_contrast.value + dir * 0.0625, 4));
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&v_gamma, bound(0.5, v_gamma.value + dir * 0.0625, 3));
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&volume, bound(0, volume.value + dir * 0.0625, 1));
-	else if (options_cursor == optnum++) Cvar_SetValueQuick(&bgmvolume, bound(0, bgmvolume.value + dir * 0.0625, 1));
 }
 
 static int optnum;
@@ -1762,14 +1756,18 @@ static void M_Options_Draw (void)
 	visible = (int)((menu_height - 32) / 8);
 	opty = 32 - bound(0, optcursor - (visible >> 1), max(0, OPTIONS_ITEMS - visible)) * 8;
 
-	M_Options_PrintCommand( "    Customize controls", true);
+	if (bigScreen == 2)
+		M_Options_PrintCommand( "       Big Screen Mode: Enabled", true);
+	else
+		M_Options_PrintCommand( "       Big Screen Mode: Disabled", true);
+	M_Options_PrintCommand( "          Control Mode", true);
 	M_Options_PrintCommand( "         Go to console", true);
 	M_Options_PrintCommand( "     Reset to defaults", true);
 	if (vrMode)
 		M_Options_PrintSlider(  " Eye Buffer Resolution", true, andrw, 256, 2048);
 	else
 		M_Options_PrintCommand( " Eye Buffer Resolution     n/a", false);
-	M_Options_PrintCommand( "      Pitch / Yaw Mode", true);
+	M_Options_PrintCommand( "   Key/Button Bindings", true);
 	M_Options_PrintSlider(  "             Crosshair", true, crosshair.value, 0, 7);
 	M_Options_PrintSlider(  "         Field of View", true, scr_fov.integer, 1, 170);
 	M_Options_PrintCheckbox("            Always Run", true, cl_forwardspeed.value > 200);
@@ -1779,7 +1777,6 @@ static void M_Options_Draw (void)
 	M_Options_PrintSlider(  "            Brightness", true, v_contrast.value, 1, 2);
 	M_Options_PrintSlider(  "                 Gamma", true, v_gamma.value, 0.5, 3);
 	M_Options_PrintSlider(  "          Sound Volume", snd_initialized.integer, volume.value, 0, 1);
-	M_Options_PrintSlider(  "          Music Volume", cdaudioinitialized.integer, bgmvolume.value, 0, 1);
 	M_Options_PrintCommand( "     Customize Effects", true);
 	M_Options_PrintCommand( "       Effects:  Quake", true);
 	M_Options_PrintCommand( "       Effects: Normal", true);
@@ -1807,20 +1804,24 @@ static void M_Options_Key (int k, int ascii)
 		switch (options_cursor)
 		{
 		case 0:
-			M_Menu_Keys_f ();
+			bigScreen = (bigScreen == 2 ? -1 : 2);
+			jni_BigScreenMode(bigScreen);
 			break;
 		case 1:
+			M_Menu_YawPitchControl_f ();
+			break;
+		case 2:
 			m_state = m_none;
 			key_dest = key_game;
 			Con_ToggleConsole_f ();
 			break;
-		case 2:
+		case 3:
 			M_Menu_Reset_f ();
 			break;
-		case 4:
-			M_Menu_YawPitchControl_f ();
+		case 5:
+			M_Menu_Keys_f ();
 			break;
-		case 9:
+		case 10:
 			M_Menu_Options_ColorControl_f ();
 			break;
 		case 15: // Customize Effects
@@ -2836,6 +2837,7 @@ static void M_Reset_Key (int key, int ascii)
 	{
 	case 'Y':
 	case 'y':
+		jni_BigScreenMode(0);
 		Cbuf_AddText ("cvar_resettodefaults_all;exec default.cfg\n");
 		// no break here since we also exit the menu
 
@@ -2941,8 +2943,8 @@ static void M_Menu_YawPitchControl_Key (int key, int ascii)
 	case K_LEFTARROW:
 		if (yawpitchcontrol_cursor == 0)
 		{
-			int newVal = 1 - cl_2dheadtracking.integer;
-			Cvar_SetValueQuick (&cl_2dheadtracking, newVal);
+			int newVal = 1 - cl_headtracking.integer;
+			Cvar_SetValueQuick (&cl_headtracking, newVal);
 		}
 		else if (yawpitchcontrol_cursor == 1)
 		{
@@ -2967,8 +2969,8 @@ static void M_Menu_YawPitchControl_Key (int key, int ascii)
 	case K_RIGHTARROW:
 		if (yawpitchcontrol_cursor == 0)
 		{
-			int newVal = 1 - cl_2dheadtracking.integer;
-			Cvar_SetValueQuick (&cl_2dheadtracking, newVal);
+			int newVal = 1 - cl_headtracking.integer;
+			Cvar_SetValueQuick (&cl_headtracking, newVal);
 		}
 		else if (yawpitchcontrol_cursor == 1)
 		{
@@ -3010,13 +3012,13 @@ static void M_Menu_YawPitchControl_Draw (void)
 	visible = (int)((menu_height - 32) / 8);
 	opty = 32 - bound(0, optcursor - (visible >> 1), max(0, YAWCONTROL_ITEMS - visible)) * 8;
 
-	if (cl_2dheadtracking.integer == 0)
-		M_Options_PrintCommand(" Non-VR Headtracking: Disabled", !vrMode);
+	if (cl_headtracking.integer == 0)
+		M_Options_PrintCommand(" Sensor Headtracking:  Disabled", true);
 	else
-		M_Options_PrintCommand(" Non-VR Headtracking:  Enabled", !vrMode);
+		M_Options_PrintCommand(" Sensor Headtracking:  Enabled", true);
 
 	if (cl_pitchmode.integer == 0)
-		M_Options_PrintCommand(" Pitch Mode:           Locked (default)", true);
+		M_Options_PrintCommand(" Pitch Mode:           Head-tracked Only (default)", true);
 	else if (cl_pitchmode.integer == 1)
 		M_Options_PrintCommand(" Pitch Mode:           Free", true);
 	else if (cl_pitchmode.integer == 2)
@@ -3431,7 +3433,7 @@ static const char *m_credits_message[11];
 static int M_CreditsMessage(const char *line1, const char *line2,
 		const char *line3, const char *line4,
 		const char *line5, const char *line6,
-		const char *line7)
+		const char *line7, const char *line8)
 {
 	int line = 0;
 	m_credits_message[line++] = line1;
@@ -3441,6 +3443,7 @@ static int M_CreditsMessage(const char *line1, const char *line2,
 	m_credits_message[line++] = line5;
 	m_credits_message[line++] = line6;
 	m_credits_message[line++] = line7;
+	m_credits_message[line++] = line8;
 	m_credits_message[line++] = NULL;
 	return 1;
 }
@@ -3450,9 +3453,10 @@ static void M_Credits_Draw (void)
 	M_CreditsMessage(
 			"   -=  QUAKE for Cardboard "QC_VERSION" =-   ",
 			"",
-			"  Coding             - DrBeef)",
+			"  Coding             - DrBeef",
 			"  DarkPlaces Engine  - LordHavoc   ",
 			"",
+			"    www.quakevr.com",
 			"",
 			"    ** Please Press Any Button **  ");
 
@@ -5075,8 +5079,10 @@ static void M_Init (void)
 void M_Draw (void)
 {
 	char vabuf[1024];
-	if (key_dest != key_menu && key_dest != key_menu_grabbed)
+	if (key_dest != key_menu && key_dest != key_menu_grabbed) {
 		m_state = m_none;
+		jni_BigScreenMode(0);
+	}
 
 	if (m_state == m_none)
 		return;
