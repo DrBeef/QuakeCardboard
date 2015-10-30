@@ -43,6 +43,7 @@ jmethodID android_terminateAudio;
 static jobject quakeCallbackObj=0;
 jmethodID android_BigScreenMode;
 jmethodID android_SwitchVRMode;
+jmethodID android_SwitchStereoMode;
 jmethodID android_SetEyeBufferResolution;
 jmethodID android_Exit;
 
@@ -103,7 +104,6 @@ void jni_terminateAudio()
 
 void jni_BigScreenMode(int mode)
 {
-	if (audioBuffer==0) return;
 	JNIEnv *env;
 	if (((*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4))<0)
 	{
@@ -112,6 +112,16 @@ void jni_BigScreenMode(int mode)
 	(*env)->CallVoidMethod(env, quakeCallbackObj, android_BigScreenMode, mode);
 }
 
+
+void jni_SwitchStereoMode(int mode)
+{
+	JNIEnv *env;
+	if (((*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4))<0)
+	{
+		(*jVM)->AttachCurrentThread(jVM,&env, NULL);
+	}
+	(*env)->CallVoidMethod(env, quakeCallbackObj, android_SwitchStereoMode, mode);
+}
 
 void jni_SwitchVRMode()
 {
@@ -431,6 +441,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setCallbackObj
 
 	android_BigScreenMode = (*env)->GetMethodID(env,quakeCallbackClass,"BigScreenMode","(I)V");
 	android_SwitchVRMode = (*env)->GetMethodID(env,quakeCallbackClass,"SwitchVRMode","()V");
+	android_SwitchStereoMode = (*env)->GetMethodID(env,quakeCallbackClass,"SwitchStereoMode","(I)V");
 	android_SetEyeBufferResolution = (*env)->GetMethodID(env,quakeCallbackClass,"SetEyeBufferResolution","(I)V");
 	android_Exit = (*env)->GetMethodID(env,quakeCallbackClass,"Exit","()V");
 }

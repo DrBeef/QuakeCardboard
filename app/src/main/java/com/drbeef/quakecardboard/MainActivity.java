@@ -51,11 +51,19 @@ public class MainActivity
     private static final int GL_RGBA8 = 0x8058;
 
     private int[] currentFBO = new int[1];
-    int fboEyeResolution = 0;
+    private int fboEyeResolution = 0;
     //This is set when the user opts to use a different resolution to the one picked as the default
-    int desiredEyeBufferResolution = -1;
+    private int desiredEyeBufferResolution = -1;
 
     private float[] eulerAngles = new float[3];
+
+    private int MONO = 0;
+    private int STEREO = 1;
+    private int WIGGLE = 2;
+
+    private int mStereoMode = STEREO;
+    private long wiggleTimeStamp = System.currentTimeMillis();
+    private int eyeID = 0;
 
     /**
      * 0 = no big screen (in game)
@@ -87,8 +95,6 @@ public class MainActivity
     private float[] view;
     private float[] modelViewProjection;
     private float[] modelView;
-    private float[] mOrthoProjection = new float[16];
-    private float[] mOrthoProjectionAndView = new float[16];
 
     private float screenDistance = 8f;
     private float screenScale = 4f;
@@ -112,13 +118,6 @@ public class MainActivity
             "  gl_FragColor = texture2D( s_texture, v_texCoord );" +
             "}";
 
-    public static final float[] SCREEN_COORDS = new float[] {
-            -1.3f, 1.0f, 1.0f,
-            -1.3f, -1.0f, 1.0f,
-            1.3f, -1.0f, 1.0f,
-            1.3f, 1.0f, 1.0f
-    };
-
     public static int loadShader(int type, String shaderCode){
         int shader = GLES20.glCreateShader(type);
         GLES20.glShaderSource(shader, shaderCode);
@@ -129,14 +128,23 @@ public class MainActivity
     //FBO render eye buffer
     private QuakeFBO fbo;
 
-    //Keep the dimensions
-    int mWidth = 0;
-    int mHeight = 0;
-
     // Geometric variables
     public static float vertices[];
-    public static short[] indices = new short[] {0, 1, 2, 0, 2, 3};
-    public static float uvs[];
+    public static final short[] indices = new short[] {0, 1, 2, 0, 2, 3};
+    public static final float uvs[] =  new float[] {
+            0.0f, 1.0f,
+            0.0f, 0.0f,
+            1.0f, 0.0f,
+            1.0f, 1.0f
+    };
+
+    public static final float[] SCREEN_COORDS = new float[] {
+            -1.3f, 1.0f, 1.0f,
+            -1.3f, -1.0f, 1.0f,
+            1.3f, -1.0f, 1.0f,
+            1.3f, 1.0f, 1.0f
+    };
+
     public FloatBuffer vertexBuffer;
     public ShortBuffer drawListBuffer;
     public FloatBuffer uvBuffer;
@@ -148,6 +156,8 @@ public class MainActivity
 
     public static boolean mQuakeInitialised = false;
     public static boolean mVRModeChanged = true;
+    //Can't rebuild eye buffers until surface changed flag recorded
+    public static boolean mSurfaceChanged = false;
 
     static {
         try {
@@ -354,9 +364,7 @@ public class MainActivity
     public void onSurfaceChanged(int width, int height)
     {
         Log.d(TAG, "onSurfaceChanged width = " + width + "  height = " + height);
-
-        mWidth = width;
-        mHeight = height;
+        mSurfaceChanged = true;
     }
 
     @Override
@@ -411,6 +419,11 @@ public class MainActivity
             bigScreen = mode;
     }
 
+    public void SwitchStereoMode(int stereo_mode)
+    {
+        mStereoMode = stereo_mode;
+    }
+
     int getDesiredfboEyeResolution(int viewportWidth) {
 
         if (desiredEyeBufferResolution != -1)
@@ -440,6 +453,9 @@ public class MainActivity
     public void onDrawEye(Eye eye) {
         if (mVRModeChanged)
         {
+            if (!mSurfaceChanged)
+                return;
+
             Log.i(TAG, "mVRModeChanged");
             if (fbo.FrameBuffer[0] != 0)
                 DestroyFBO(fbo);
@@ -475,26 +491,54 @@ public class MainActivity
             //Record the curent fbo
             GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, currentFBO, 0);
 
-            //Bind our special fbo
-            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
-            GLES20.glEnable(GLES20.GL_DEPTH_TEST);
-            GLES20.glDepthFunc(GLES20.GL_LEQUAL);
-            GLES20.glEnable(GLES20.GL_SCISSOR_TEST);
+            //Stereo Mode logic
+            //Stereo = Draw current eye
+            //Mono  = Draw only left eye
+            //Wiggle = Draw left or right intermittently (non-vr or big-screen mode only)
+            if (mStereoMode == STEREO ||
+                    mStereoMode == WIGGLE ||
+                    (mStereoMode == MONO && eye.getType() < 2))
+            {
+                //Bind our special fbo
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
+                GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+                GLES20.glDepthFunc(GLES20.GL_LEQUAL);
+                GLES20.glEnable(GLES20.GL_SCISSOR_TEST);
 
-            if (cardboardView.getVRMode()) {
-                GLES20.glScissor(0, 0, fboEyeResolution, fboEyeResolution);
-            } else {
-                GLES20.glScissor(0, 0, eye.getViewport().width, eye.getViewport().height);
+                if (cardboardView.getVRMode()) {
+                    GLES20.glScissor(0, 0, fboEyeResolution, fboEyeResolution);
+                } else {
+                    GLES20.glScissor(0, 0, eye.getViewport().width, eye.getViewport().height);
+                }
+
+                GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+                GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+
+                //Decide which eye we are drawing
+                if (mStereoMode == MONO)
+                    eyeID = 0;
+                else if (mStereoMode == WIGGLE &&
+                        //Wiggle only works if we are not in vr mode or
+                        //we are in vr mode using permanent big screen
+                        (!cardboardView.getVRMode() || bigScreen == 2))
+                {
+                    if (System.currentTimeMillis() - wiggleTimeStamp > 100)
+                    {
+                        eyeID = 1 - eyeID;
+                        wiggleTimeStamp = System.currentTimeMillis();
+                    }
+                }
+                else if (!cardboardView.getVRMode())
+                    eyeID = 0;
+                else // mStereoMode == StereoMode.STEREO  -  Default behaviour for VR mode
+                    eyeID = eye.getType() - 1;
+
+                //Hopefully type indicates 0 = mono, 1 = left, 2 = right
+                QuakeJNILib.onDrawEye(eyeID, 0, 0);
+
+                //Finished rendering to our frame buffer, now draw this to the target framebuffer
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, currentFBO[0]);
             }
-
-            GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-
-            //Hopefully type indicates 0 = mono, 1 = left, 2 = right
-            QuakeJNILib.onDrawEye(eye.getType() == 0 ? 0 : eye.getType() - 1, 0, 0);
-
-            //Finished rendering to our frame buffer, now draw this to the target framebuffer
-            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, currentFBO[0]);
 
             GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
             GLES20.glViewport(eye.getViewport().x, eye.getViewport().y, eye.getViewport().width, eye.getViewport().height);
@@ -514,31 +558,24 @@ public class MainActivity
                 // Set the position of the screen
                 GLES20.glVertexAttribPointer(positionParam, 3, GLES20.GL_FLOAT, false, 0, screenVertices);
 
-                // Prepare the texturecoordinates
-                GLES20.glVertexAttribPointer(texCoordParam, 2, GLES20.GL_FLOAT, false, 0, uvBuffer);
-
-                // Set the ModelViewProjection matrix in the shader.
-                GLES20.glUniformMatrix4fv(modelViewProjectionParam, 1, false, modelViewProjection, 0);
-
             } else {
 
                 // Create the triangles for orthographic projection (if required)
                 SetupTriangle(0, 0, eye.getViewport().width, eye.getViewport().height);
 
-                Matrix.orthoM(mOrthoProjection, 0, 0, eye.getViewport().width, 0, eye.getViewport().height, 0, 50);
-
                 // Calculate the projection and view transformation
-                Matrix.multiplyMM(mOrthoProjectionAndView, 0, mOrthoProjection, 0, camera, 0);
+                Matrix.orthoM(view, 0, 0, eye.getViewport().width, 0, eye.getViewport().height, 0, 50);
+                Matrix.multiplyMM(modelViewProjection, 0, view, 0, camera, 0);
 
                 // Prepare the triangle coordinate data
                 GLES20.glVertexAttribPointer(positionParam, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer);
-
-                // Prepare the texturecoordinates
-                GLES20.glVertexAttribPointer(texCoordParam, 2, GLES20.GL_FLOAT, false, 0, uvBuffer);
-
-                // Apply the projection and view transformation
-                GLES20.glUniformMatrix4fv(modelViewProjectionParam, 1, false, mOrthoProjectionAndView, 0);
             }
+
+            // Prepare the texturecoordinates
+            GLES20.glVertexAttribPointer(texCoordParam, 2, GLES20.GL_FLOAT, false, 0, uvBuffer);
+
+            // Apply the projection and view transformation
+            GLES20.glUniformMatrix4fv(modelViewProjectionParam, 1, false, modelViewProjection, 0);
 
             // Bind texture to fbo's color texture
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
@@ -897,14 +934,6 @@ public class MainActivity
 
     public void SetupUVCoords()
     {
-        // Create our UV coordinates.
-        uvs = new float[] {
-                0.0f, 1.0f,
-                0.0f, 0.0f,
-                1.0f, 0.0f,
-                1.0f, 1.0f
-        };
-
         // The texture buffer
         ByteBuffer bb = ByteBuffer.allocateDirect(uvs.length * 4);
         bb.order(ByteOrder.nativeOrder());
@@ -947,6 +976,7 @@ public class MainActivity
     public void SwitchVRMode() {
         cardboardView.setVRModeEnabled(!cardboardView.getVRMode());
         mVRModeChanged = true;
+        mSurfaceChanged = false;
     }
 
     @Override

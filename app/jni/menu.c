@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mprogdefs.h"
 
-#define QC_VERSION  "1.3.0"
+#define QC_VERSION  "1.3.1"
 
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
@@ -35,9 +35,10 @@ static cvar_t menu_progs = { 0, "menu_progs", "menu.dat", "name of quakec menu.d
 
 static int NehGameType;
 
-//Game always starts in vr mode
+//Game always starts in vr mode, showing the menu on the big screen in stereo
 qboolean vrMode = true;
 int bigScreen = 1;
+int stereoMode = 1;
 
 enum m_state_e m_state = m_main;
 char m_return_reason[128];
@@ -50,6 +51,7 @@ extern char *strGameFolder;
 extern void jni_setEyeBufferResolution(int resolution);
 extern void jni_SwitchVRMode();
 extern void jni_BigScreenMode(int mode);
+extern void jni_SwitchStereoMode(int mode);
 
 //Record yaw at the moment the menu is invoked
 static float hmdYaw = 0;
@@ -1653,6 +1655,10 @@ static void M_Menu_Options_AdjustSliders (int dir)
 		bigScreen = (bigScreen == 2 ? -1 : 2);
 		jni_BigScreenMode(bigScreen);
 	}
+	else if (options_cursor == optnum++) {
+		stereoMode = ((stereoMode + 3) + dir) % 3;
+		jni_SwitchStereoMode(stereoMode);
+	}
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++) ;
@@ -1760,8 +1766,22 @@ static void M_Options_Draw (void)
 		M_Options_PrintCommand( "       Big Screen Mode: Enabled", true);
 	else
 		M_Options_PrintCommand( "       Big Screen Mode: Disabled", true);
-	M_Options_PrintCommand( "          Control Mode", true);
-	M_Options_PrintCommand( "         Go to console", true);
+
+	switch (stereoMode)
+	{
+		case 0:
+			M_Options_PrintCommand( "     Stereo Mode: MONO", true);
+			break;
+		case 1:
+			M_Options_PrintCommand( "     Stereo Mode: STEREO", true);
+			break;
+		case 2:
+			M_Options_PrintCommand( "     Stereo Mode: WIGGLE (Non-VR/Big-Screen)", true);
+			break;
+	}
+
+	M_Options_PrintCommand( "   Controller Settings", true);
+	M_Options_PrintCommand( "    Open Quake Console", true);
 	M_Options_PrintCommand( "     Reset to defaults", true);
 	if (vrMode)
 		M_Options_PrintSlider(  " Eye Buffer Resolution", true, andrw, 256, 2048);
@@ -1808,50 +1828,54 @@ static void M_Options_Key (int k, int ascii)
 			jni_BigScreenMode(bigScreen);
 			break;
 		case 1:
-			M_Menu_YawPitchControl_f ();
+			stereoMode = ++stereoMode % 3;
+			jni_SwitchStereoMode(stereoMode);
 			break;
 		case 2:
+			M_Menu_YawPitchControl_f ();
+			break;
+		case 3:
 			m_state = m_none;
 			key_dest = key_game;
 			Con_ToggleConsole_f ();
 			break;
-		case 3:
+		case 4:
 			M_Menu_Reset_f ();
 			break;
-		case 5:
+		case 6:
 			M_Menu_Keys_f ();
 			break;
-		case 10:
+		case 11:
 			M_Menu_Options_ColorControl_f ();
 			break;
-		case 15: // Customize Effects
+		case 16: // Customize Effects
 			M_Menu_Options_Effects_f ();
 			break;
-		case 16: // Effects: Quake
+		case 17: // Effects: Quake
 			Cbuf_AddText("cl_particles 1;cl_particles_quake 1;cl_particles_quality 1;cl_particles_explosions_shell 0;r_explosionclip 1;cl_stainmaps 0;cl_stainmaps_clearonload 1;cl_decals 0;cl_particles_bulletimpacts 1;cl_particles_smoke 1;cl_particles_sparks 1;cl_particles_bubbles 1;cl_particles_blood 1;cl_particles_blood_alpha 1;cl_particles_blood_bloodhack 0;cl_beams_polygons 0;cl_beams_instantaimhack 0;cl_beams_quakepositionhack 1;cl_beams_lightatend 0;r_lerpmodels 1;r_lerpsprites 1;r_lerplightstyles 0;gl_polyblend 1;r_skyscroll1 1;r_skyscroll2 2;r_waterwarp 1;r_wateralpha 1;r_waterscroll 1\n");
 			break;
-		case 17: // Effects: Normal
+		case 18: // Effects: Normal
 			Cbuf_AddText("cl_particles 1;cl_particles_quake 0;cl_particles_quality 1;cl_particles_explosions_shell 0;r_explosionclip 1;cl_stainmaps 0;cl_stainmaps_clearonload 1;cl_decals 1;cl_particles_bulletimpacts 1;cl_particles_smoke 1;cl_particles_sparks 1;cl_particles_bubbles 1;cl_particles_blood 1;cl_particles_blood_alpha 1;cl_particles_blood_bloodhack 1;cl_beams_polygons 1;cl_beams_instantaimhack 0;cl_beams_quakepositionhack 1;cl_beams_lightatend 0;r_lerpmodels 1;r_lerpsprites 1;r_lerplightstyles 0;gl_polyblend 1;r_skyscroll1 1;r_skyscroll2 2;r_waterwarp 1;r_wateralpha 1;r_waterscroll 1\n");
 			break;
-		case 18: // Effects: High
+		case 19: // Effects: High
 			Cbuf_AddText("cl_particles 1;cl_particles_quake 0;cl_particles_quality 2;cl_particles_explosions_shell 0;r_explosionclip 1;cl_stainmaps 1;cl_stainmaps_clearonload 1;cl_decals 1;cl_particles_bulletimpacts 1;cl_particles_smoke 1;cl_particles_sparks 1;cl_particles_bubbles 1;cl_particles_blood 1;cl_particles_blood_alpha 1;cl_particles_blood_bloodhack 1;cl_beams_polygons 1;cl_beams_instantaimhack 0;cl_beams_quakepositionhack 1;cl_beams_lightatend 0;r_lerpmodels 1;r_lerpsprites 1;r_lerplightstyles 0;gl_polyblend 1;r_skyscroll1 1;r_skyscroll2 2;r_waterwarp 1;r_wateralpha 1;r_waterscroll 1\n");
 			break;
-		case 19:
+		case 20:
 			M_Menu_Options_Graphics_f ();
 			break;
-		case 20: // Lighting: Flares
+		case 21: // Lighting: Flares
 			Cbuf_AddText("r_coronas 1;gl_flashblend 1;r_shadow_gloss 0;r_shadow_realtime_dlight 0;r_shadow_realtime_dlight_shadows 0;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 0");
 			break;
-		case 21: // Lighting: Normal
+		case 22: // Lighting: Normal
 			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 0;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 0");
 			break;
-		case 22: // Lighting: High
+		case 23: // Lighting: High
 			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 1;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 1");
 			break;
-		case 23: // Lighting: Full
+		case 24: // Lighting: Full
 			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 1;r_shadow_realtime_world 1;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 1");
 			break;
-		case 24:
+		case 25:
 			M_Menu_ModList_f ();
 			break;
 		default:
