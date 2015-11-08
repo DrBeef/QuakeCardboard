@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mprogdefs.h"
 
-#define QC_VERSION  "1.3.1"
+#define QC_VERSION  "1.3.2"
 
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
@@ -35,10 +35,14 @@ static cvar_t menu_progs = { 0, "menu_progs", "menu.dat", "name of quakec menu.d
 
 static int NehGameType;
 
+static const char* sNo = "No";
+static const char* sYes = "Yes";
+
 //Game always starts in vr mode, showing the menu on the big screen in stereo
 qboolean vrMode = true;
 int bigScreen = 1;
 int stereoMode = 1;
+qboolean swapEyes = false;
 
 enum m_state_e m_state = m_main;
 char m_return_reason[128];
@@ -52,6 +56,7 @@ extern void jni_setEyeBufferResolution(int resolution);
 extern void jni_SwitchVRMode();
 extern void jni_BigScreenMode(int mode);
 extern void jni_SwitchStereoMode(int mode);
+extern void jni_SwapEyes();
 
 //Record yaw at the moment the menu is invoked
 static float hmdYaw = 0;
@@ -1680,21 +1685,30 @@ static void M_Menu_Options_AdjustSliders (int dir)
 				 jni_setEyeBufferResolution(andrw);
 			 }
 		 }
+	else if (options_cursor == optnum++)
+	{
+		swapEyes = !swapEyes;
+		jni_SwapEyes();
+	}
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&crosshair, bound(0, crosshair.integer + dir, 7));
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&scr_fov, bound(1, scr_fov.integer + dir * 1, 170));
 	else if (options_cursor == optnum++)
 	{
-		if (cl_forwardspeed.value > 200)
-		{
-			Cvar_SetValueQuick (&cl_forwardspeed, 200);
-			Cvar_SetValueQuick (&cl_backspeed, 200);
-		}
-		else
-		{
-			Cvar_SetValueQuick (&cl_forwardspeed, 400);
-			Cvar_SetValueQuick (&cl_backspeed, 400);
-		}
+		cl_forwardspeed.value += dir * 10;
+		if (cl_forwardspeed.value > 500)
+			cl_forwardspeed.value = 500;
+		if (cl_forwardspeed.value < 10)
+			cl_forwardspeed.value = 10;
+
+		cl_backspeed.value += dir * 10;
+		if (cl_backspeed.value > 500)
+			cl_backspeed.value = 500;
+		if (cl_backspeed.value < 10)
+			cl_backspeed.value = 10;
+
+		Cvar_SetValueQuick (&cl_forwardspeed, cl_forwardspeed.value);
+		Cvar_SetValueQuick (&cl_backspeed, cl_backspeed.value);
 	}
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&showfps, !showfps.integer);
 	else if (options_cursor == optnum++) ;
@@ -1763,9 +1777,9 @@ static void M_Options_Draw (void)
 	opty = 32 - bound(0, optcursor - (visible >> 1), max(0, OPTIONS_ITEMS - visible)) * 8;
 
 	if (bigScreen == 2)
-		M_Options_PrintCommand( "       Big Screen Mode: Enabled", true);
+		M_Options_PrintCommand( "        Big Screen Mode Enabled", true);
 	else
-		M_Options_PrintCommand( "       Big Screen Mode: Disabled", true);
+		M_Options_PrintCommand( "        Big Screen Mode Disabled", true);
 
 	switch (stereoMode)
 	{
@@ -1787,10 +1801,12 @@ static void M_Options_Draw (void)
 		M_Options_PrintSlider(  " Eye Buffer Resolution", true, andrw, 256, 2048);
 	else
 		M_Options_PrintCommand( " Eye Buffer Resolution     n/a", false);
+	char buf[356];
+	M_Options_PrintCommand( va(buf, sizeof(buf), "             Swap Eyes %s", (swapEyes ? sYes : sNo)), true);
 	M_Options_PrintCommand( "   Key/Button Bindings", true);
 	M_Options_PrintSlider(  "             Crosshair", true, crosshair.value, 0, 7);
 	M_Options_PrintSlider(  "         Field of View", true, scr_fov.integer, 1, 170);
-	M_Options_PrintCheckbox("            Always Run", true, cl_forwardspeed.value > 200);
+	M_Options_PrintSlider(  " Player Movement Speed", true, cl_forwardspeed.value, 10, 500);
 	M_Options_PrintCheckbox("        Show Framerate", true, showfps.integer);
 	M_Options_PrintCommand( "     Custom Brightness", true);
 	M_Options_PrintSlider(  "       Game Brightness", true, r_hdr_scenebrightness.value, 1, 4);
@@ -1843,39 +1859,43 @@ static void M_Options_Key (int k, int ascii)
 			M_Menu_Reset_f ();
 			break;
 		case 6:
+			swapEyes = !swapEyes;
+			jni_SwapEyes();
+			break;
+		case 7:
 			M_Menu_Keys_f ();
 			break;
-		case 11:
+		case 12:
 			M_Menu_Options_ColorControl_f ();
 			break;
-		case 16: // Customize Effects
+		case 17: // Customize Effects
 			M_Menu_Options_Effects_f ();
 			break;
-		case 17: // Effects: Quake
+		case 18: // Effects: Quake
 			Cbuf_AddText("cl_particles 1;cl_particles_quake 1;cl_particles_quality 1;cl_particles_explosions_shell 0;r_explosionclip 1;cl_stainmaps 0;cl_stainmaps_clearonload 1;cl_decals 0;cl_particles_bulletimpacts 1;cl_particles_smoke 1;cl_particles_sparks 1;cl_particles_bubbles 1;cl_particles_blood 1;cl_particles_blood_alpha 1;cl_particles_blood_bloodhack 0;cl_beams_polygons 0;cl_beams_instantaimhack 0;cl_beams_quakepositionhack 1;cl_beams_lightatend 0;r_lerpmodels 1;r_lerpsprites 1;r_lerplightstyles 0;gl_polyblend 1;r_skyscroll1 1;r_skyscroll2 2;r_waterwarp 1;r_wateralpha 1;r_waterscroll 1\n");
 			break;
-		case 18: // Effects: Normal
+		case 19: // Effects: Normal
 			Cbuf_AddText("cl_particles 1;cl_particles_quake 0;cl_particles_quality 1;cl_particles_explosions_shell 0;r_explosionclip 1;cl_stainmaps 0;cl_stainmaps_clearonload 1;cl_decals 1;cl_particles_bulletimpacts 1;cl_particles_smoke 1;cl_particles_sparks 1;cl_particles_bubbles 1;cl_particles_blood 1;cl_particles_blood_alpha 1;cl_particles_blood_bloodhack 1;cl_beams_polygons 1;cl_beams_instantaimhack 0;cl_beams_quakepositionhack 1;cl_beams_lightatend 0;r_lerpmodels 1;r_lerpsprites 1;r_lerplightstyles 0;gl_polyblend 1;r_skyscroll1 1;r_skyscroll2 2;r_waterwarp 1;r_wateralpha 1;r_waterscroll 1\n");
 			break;
-		case 19: // Effects: High
+		case 20: // Effects: High
 			Cbuf_AddText("cl_particles 1;cl_particles_quake 0;cl_particles_quality 2;cl_particles_explosions_shell 0;r_explosionclip 1;cl_stainmaps 1;cl_stainmaps_clearonload 1;cl_decals 1;cl_particles_bulletimpacts 1;cl_particles_smoke 1;cl_particles_sparks 1;cl_particles_bubbles 1;cl_particles_blood 1;cl_particles_blood_alpha 1;cl_particles_blood_bloodhack 1;cl_beams_polygons 1;cl_beams_instantaimhack 0;cl_beams_quakepositionhack 1;cl_beams_lightatend 0;r_lerpmodels 1;r_lerpsprites 1;r_lerplightstyles 0;gl_polyblend 1;r_skyscroll1 1;r_skyscroll2 2;r_waterwarp 1;r_wateralpha 1;r_waterscroll 1\n");
 			break;
-		case 20:
+		case 21:
 			M_Menu_Options_Graphics_f ();
 			break;
-		case 21: // Lighting: Flares
+		case 22: // Lighting: Flares
 			Cbuf_AddText("r_coronas 1;gl_flashblend 1;r_shadow_gloss 0;r_shadow_realtime_dlight 0;r_shadow_realtime_dlight_shadows 0;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 0");
 			break;
-		case 22: // Lighting: Normal
+		case 23: // Lighting: Normal
 			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 0;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 0");
 			break;
-		case 23: // Lighting: High
+		case 24: // Lighting: High
 			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 1;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 1");
 			break;
-		case 24: // Lighting: Full
+		case 25: // Lighting: Full
 			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 1;r_shadow_realtime_world 1;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 1");
 			break;
-		case 25:
+		case 26:
 			M_Menu_ModList_f ();
 			break;
 		default:

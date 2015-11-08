@@ -55,6 +55,10 @@ public class MainActivity
     //This is set when the user opts to use a different resolution to the one picked as the default
     private int desiredEyeBufferResolution = -1;
 
+    //SOunds like it is reuired for Mattel view master
+    private boolean swapEyes = false;
+
+    //Head orientation
     private float[] eulerAngles = new float[3];
 
     private int MONO = 0;
@@ -419,6 +423,11 @@ public class MainActivity
             bigScreen = mode;
     }
 
+    public void SwapEyes()
+    {
+        swapEyes = !swapEyes;
+    }
+
     public void SwitchStereoMode(int stereo_mode)
     {
         mStereoMode = stereo_mode;
@@ -496,8 +505,8 @@ public class MainActivity
             //Mono  = Draw only left eye
             //Wiggle = Draw left or right intermittently (non-vr or big-screen mode only)
             if (mStereoMode == STEREO ||
-                    mStereoMode == WIGGLE ||
-                    (mStereoMode == MONO && eye.getType() < 2))
+                    ((mStereoMode == WIGGLE ||
+                    mStereoMode == MONO) && eye.getType() < 2))
             {
                 //Bind our special fbo
                 GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
@@ -532,6 +541,9 @@ public class MainActivity
                     eyeID = 0;
                 else // mStereoMode == StereoMode.STEREO  -  Default behaviour for VR mode
                     eyeID = eye.getType() - 1;
+
+                if (swapEyes)
+                    eyeID = 1 - eyeID;
 
                 //Hopefully type indicates 0 = mono, 1 = left, 2 = right
                 QuakeJNILib.onDrawEye(eyeID, 0, 0);
