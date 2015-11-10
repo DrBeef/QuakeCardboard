@@ -7,6 +7,5 @@ public interface QuakeCallback {
     void BigScreenMode(int mode);
     void SwitchStereoMode(int stereo_mode);
     void SetEyeBufferResolution(int newResolution);
-    void SwapEyes();
     void Exit();
 }

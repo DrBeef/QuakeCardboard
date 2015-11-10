@@ -55,9 +55,6 @@ public class MainActivity
     //This is set when the user opts to use a different resolution to the one picked as the default
     private int desiredEyeBufferResolution = -1;
 
-    //SOunds like it is reuired for Mattel view master
-    private boolean swapEyes = false;
-
     //Head orientation
     private float[] eulerAngles = new float[3];
 
@@ -213,37 +210,6 @@ public class MainActivity
             out.write(buf, 0, count);
         }
     }
-
-
-    public void patchConfig(String dir) throws Exception
-    {
-        if (new File(dir+"/id1/config.cfg").exists())
-        {
-            BufferedReader br=new BufferedReader(new FileReader(dir+"/id1/config.cfg"));
-            String s;
-            StringBuilder sb=new StringBuilder(0);
-            boolean needsPatching = false;
-            while ((s=br.readLine())!=null)
-            {
-                if (!s.contains("cl_forwardspeed") &&
-                        !s.contains("cl_backspeed"))
-                {
-                    sb.append(s+"\n");
-                }
-                else
-                    needsPatching = true;
-            }
-            br.close();
-
-            if (needsPatching)
-            {
-                FileWriter fw=new FileWriter(dir+"/id1/config.cfg");
-                fw.write(sb.toString());fw.flush();fw.close();
-            }
-        }
-
-    }
-
 
     static boolean CreateFBO( QuakeFBO fbo, int offset, int width, int height)
     {
@@ -423,11 +389,6 @@ public class MainActivity
             bigScreen = mode;
     }
 
-    public void SwapEyes()
-    {
-        swapEyes = !swapEyes;
-    }
-
     public void SwitchStereoMode(int stereo_mode)
     {
         mStereoMode = stereo_mode;
@@ -541,9 +502,6 @@ public class MainActivity
                     eyeID = 0;
                 else // mStereoMode == StereoMode.STEREO  -  Default behaviour for VR mode
                     eyeID = eye.getType() - 1;
-
-                if (swapEyes)
-                    eyeID = 1 - eyeID;
 
                 //Hopefully type indicates 0 = mono, 1 = left, 2 = right
                 QuakeJNILib.onDrawEye(eyeID, 0, 0);
