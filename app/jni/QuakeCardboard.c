@@ -183,21 +183,6 @@ int Sys_Milliseconds (void)
 	return curtime;
 }
 
-static const float meters_to_units = 40.0f;
-
-//Should get this from OVR
-float GVR_GetSeparation()
-{
-	static float separation = 0.0;
-	if (separation == 0.0)
-	{
-		//Generic eye separation of 0.065 metres
-		separation = meters_to_units * 0.065;
-	}
-	return separation;
-}
-
-
 int returnvalue = -1;
 void QC_exit(int exitCode)
 {
