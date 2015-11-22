@@ -60,10 +60,8 @@ public class MainActivity
 
     private int MONO = 0;
     private int STEREO = 1;
-    private int WIGGLE = 2;
 
     private int mStereoMode = STEREO;
-    private long wiggleTimeStamp = System.currentTimeMillis();
     private int eyeID = 0;
 
     /**
@@ -464,7 +462,6 @@ public class MainActivity
             //Stereo Mode logic
             //Stereo = Draw current eye
             //Mono  = Draw only left eye
-            //Wiggle = Draw left or right intermittently (non-vr or big-screen mode only)
             if (mStereoMode == STEREO ||
                     (mStereoMode == MONO && eye.getType() < 2))
             {
@@ -486,17 +483,6 @@ public class MainActivity
                 //Decide which eye we are drawing
                 if (mStereoMode == MONO)
                     eyeID = 0;
-                else if (mStereoMode == WIGGLE &&
-                        //Wiggle only works if we are not in vr mode or
-                        //we are in vr mode using permanent big screen
-                        (!cardboardView.getVRMode() || bigScreen == 2))
-                {
-                    if (System.currentTimeMillis() - wiggleTimeStamp > 100)
-                    {
-                        eyeID = 1 - eyeID;
-                        wiggleTimeStamp = System.currentTimeMillis();
-                    }
-                }
                 else if (!cardboardView.getVRMode())
                     eyeID = 0;
                 else // mStereoMode == StereoMode.STEREO  -  Default behaviour for VR mode

@@ -1661,7 +1661,7 @@ static void M_Menu_Options_AdjustSliders (int dir)
 		jni_BigScreenMode(bigScreen);
 	}
 	else if (options_cursor == optnum++) {
-		stereoMode = ((stereoMode + 3) + dir) % 3;
+		stereoMode = 1 - stereoMode;
 		jni_SwitchStereoMode(stereoMode);
 	}
 	else if (options_cursor == optnum++) ;
@@ -1796,9 +1796,6 @@ static void M_Options_Draw (void)
 		case 1:
 			M_Options_PrintCommand( "     Stereo Mode: STEREO", true);
 			break;
-		case 2:
-			M_Options_PrintCommand( "     Stereo Mode: WIGGLE (Non-VR/Big-Screen)", true);
-			break;
 	}
 
 	M_Options_PrintCommand( "   Controller Settings", true);
@@ -1850,7 +1847,7 @@ static void M_Options_Key (int k, int ascii)
 			jni_BigScreenMode(bigScreen);
 			break;
 		case 1:
-			stereoMode = ++stereoMode % 3;
+			stereoMode = 1 - stereoMode;
 			jni_SwitchStereoMode(stereoMode);
 			break;
 		case 2:
