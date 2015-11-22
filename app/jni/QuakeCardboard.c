@@ -29,6 +29,7 @@ extern qboolean vrMode;
 extern int bigScreen;
 
 extern cvar_t cl_headtracking;
+extern cvar_t cl_centreoffset;
 
 static JavaVM *jVM;
 static jobject audioBuffer=0;
@@ -378,6 +379,11 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onSwitchVRMode
 JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onBigScreenMode( JNIEnv * env, jobject obj, int mode )
 {
 	bigScreen = mode;
+}
+
+JNIEXPORT int JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_getCentreOffset( JNIEnv * env, jobject obj )
+{
+	return cl_centreoffset.integer;
 }
 
 JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onKeyEvent( JNIEnv * env, jobject obj, int keyCode, int action, int character )

@@ -466,8 +466,7 @@ public class MainActivity
             //Mono  = Draw only left eye
             //Wiggle = Draw left or right intermittently (non-vr or big-screen mode only)
             if (mStereoMode == STEREO ||
-                    ((mStereoMode == WIGGLE ||
-                    mStereoMode == MONO) && eye.getType() < 2))
+                    (mStereoMode == MONO && eye.getType() < 2))
             {
                 //Bind our special fbo
                 GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
@@ -531,7 +530,15 @@ public class MainActivity
             } else {
 
                 // Create the triangles for orthographic projection (if required)
-                SetupTriangle(0, 0, eye.getViewport().width, eye.getViewport().height);
+                int offset = QuakeJNILib.getCentreOffset();
+                if (eye.getType() == 1)
+                    offset *= -1;
+
+                int w = (int)(0.9 * eye.getViewport().width);
+                int h = (int)(0.9 * eye.getViewport().height);
+                int x = (int)(0.05 * eye.getViewport().width);
+                int y = (int)(0.05 * eye.getViewport().height);
+                SetupTriangle(offset + x, y, w, h);
 
                 // Calculate the projection and view transformation
                 Matrix.orthoM(view, 0, 0, eye.getViewport().width, 0, eye.getViewport().height, 0, 50);
