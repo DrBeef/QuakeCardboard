@@ -16,6 +16,7 @@ public class QuakeJNILib {
     public static native void onSwitchVRMode( );
     public static native void onBigScreenMode( int mode );
     public static native int  getCentreOffset( );
+    public static native void setDownloadStatus( int status );
 
     //Audio
     public static native void requestAudioData();

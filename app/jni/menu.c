@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mprogdefs.h"
 
-#define QC_VERSION  "1.4.1"
+#define QC_VERSION  "1.5.1"
 
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
@@ -230,9 +230,19 @@ static void M_Print(float cx, float cy, const char *str)
 	DrawQ_String(menu_x + cx, menu_y + cy, str, 0, 8, 8, 1, 1, 1, 1, 0, NULL, true, FONT_MENU);
 }
 
+static void M_Print_Big(float cx, float cy, const char *str)
+{
+	DrawQ_String(menu_x + cx, menu_y + cy, str, 0, 12, 12, 1, 1, 1, 1, 0, NULL, true, FONT_MENU);
+}
+
 static void M_PrintRed(float cx, float cy, const char *str)
 {
 	DrawQ_String(menu_x + cx, menu_y + cy, str, 0, 8, 8, 1, 0, 0, 1, 0, NULL, true, FONT_MENU);
+}
+
+static void M_PrintRed_Big(float cx, float cy, const char *str)
+{
+	DrawQ_String(menu_x + cx, menu_y + cy, str, 0, 12, 12, 1, 0, 0, 1, 0, NULL, true, FONT_MENU);
 }
 
 static void M_ItemPrint(float cx, float cy, const char *str, int unghosted)
@@ -400,6 +410,7 @@ static void M_Demo_Key (int k, int ascii)
 
 static int	m_main_cursor;
 static qboolean m_missingdata = false;
+int gameAssetsDownloadStatus = -1;
 
 static int MAIN_ITEMS = 5; // Nehahra: Menu Disable
 
@@ -493,17 +504,84 @@ static void M_Main_Draw (void)
 		const char *s;
 		M_Background(640, 480); //fall back is always to 640x480, this makes it most readable at that.
 		y = 480/3-16;
-		s = "You have reached this menu due to missing or unlocatable content/data";
-		M_PrintRed ((640-strlen(s)*8)*0.5, (480/3)-16, s);y+=8;
-		y+=8;
-		s = "Please copy the PAK files from the fullgame or";M_Print (100, y, s);y+=8;
-		s = "shareware version (which you can download for free from";M_Print (100, y, s);y+=8;
-		s = "the following location: http://bit.ly/1PTsnsb )";M_Print (100, y, s);y+=8;
-		s = "to the following folder on your device:";M_Print (100, y, s);y+=16;
-		char buffer[1024];
-		s = va(buffer, 1024, "%s/id1", strGameFolder);M_Print (100, y, s);y+=8;
-		M_Print (640/2 - 48, 480/2 + 8, "Tap Screen to Quit");
-		M_DrawCharacter(640/2 - 86, 480/2 + 8, 12+((int)(realtime*4)&1));
+
+		if (gameAssetsDownloadStatus == -1)
+		{
+			s = "** YOU NEED TO COPY GAME FILES TO YOUR PHONE **";
+			M_PrintRed_Big ((640-strlen(s)*12)*0.5, (480/3)-16, s);y+=32;
+			s = "Due to copyright, game data files can't be included";M_Print_Big (30, y, s);y+=20;
+			s = "Please download the shareware version from:";M_Print_Big(30, y, s);y+=20;
+			s = "http://bit.ly/1PTsnsb";M_Print_Big(30, y, s);y+=20;
+			s = "or copy the pak files from the full version ";M_Print_Big(30, y, s);y+=20;
+			s = "to the following folder :";M_Print_Big(30, y, s);y+=20;
+			s = "{PHONE_MEMORY} / Q4C / id1";M_Print_Big(30, y, s);y+=28;
+			s = "Full instructions doc: http://bit.ly/21GHVXI";M_Print_Big(30, y, s);y+=20;
+		}
+		else if (gameAssetsDownloadStatus == 0)
+		{
+			s = "** GAME FILES DOWNLOAD FAILED **";
+			M_PrintRed_Big((640 - strlen(s) * 12) * 0.5, (480 / 3) - 16, s);
+			y += 32;
+			s = "Please restart Quake for Cardboard";
+			M_Print_Big(30, y, s);
+			y += 20;
+			s = "and the download will try again";
+			M_Print_Big(30, y, s);
+			y += 20;
+			s = "If you own the full game you can";
+			M_Print_Big(30, y, s);
+			y += 20;
+			s = "copy the pak files from the full version ";
+			M_Print_Big(30, y, s);
+			y += 20;
+			s = "to the following folder :";
+			M_Print_Big(30, y, s);
+			y += 20;
+			s = "{PHONE_MEMORY} / Q4C / id1";
+			M_Print_Big(30, y, s);
+			y += 28;
+			s = "Full instructions doc: http://bit.ly/21GHVXI";
+			M_Print_Big(30, y, s);
+			y += 20;
+		}
+		else if (gameAssetsDownloadStatus == 1) {
+			s = "** GAME FILES DOWNLOAD COMPLETED SUCCESSFULLY **";
+			M_PrintRed_Big((640 - strlen(s) * 12) * 0.5, (480 / 3) - 16, s);
+			y += 32;
+			s = "Please restart Quake for Cardboard";
+			M_Print_Big(30, y, s);
+			y += 20;
+			s = "If you own the full game you can";
+			M_Print_Big(30, y, s);
+			y += 20;
+			s = "copy the pak files from the full version ";
+			M_Print_Big(30, y, s);
+			y += 20;
+			s = "to the following folder :";
+			M_Print_Big(30, y, s);
+			y += 20;
+			s = "{PHONE_MEMORY} / Q4C / id1";
+			M_Print_Big(30, y, s);
+			y += 28;
+			s = "Full instructions doc: http://bit.ly/21GHVXI";
+			M_Print_Big(30, y, s);
+			y += 20;
+		}
+		else if (gameAssetsDownloadStatus == 2)
+		{
+			s = "** GAME FILES NEED TO DOWNLOAD TO YOUR PHONE **";
+			M_PrintRed_Big((640 - strlen(s) * 12) * 0.5, (480 / 3) - 16, s);
+			y += 32;
+			s = "Due to copyright, game data files can't be included";
+			M_Print_Big(30, y, s);
+			y += 20;
+			s = "The shareware version is downloading.";
+			M_Print_Big(30, y, s);
+		}
+
+		M_Print_Big (640/2 - 128, 480/2 + 128, " ++ Tap Screen to Quit ++");
+
+		M_DrawCharacter(640/2 - 128, 480/2 + 128, 12+((int)(realtime*4)&1));
 		return;
 	}
 
@@ -3000,8 +3078,7 @@ static void M_Menu_YawPitchControl_Key (int key, int ascii)
 	case K_LEFTARROW:
 		if (yawpitchcontrol_cursor == 0)
 		{
-			int newVal = 1 - cl_headtracking.integer;
-			Cvar_SetValueQuick (&cl_headtracking, newVal);
+			headtracking = !headtracking;
 		}
 		else if (yawpitchcontrol_cursor == 1)
 		{
@@ -3026,8 +3103,7 @@ static void M_Menu_YawPitchControl_Key (int key, int ascii)
 	case K_RIGHTARROW:
 		if (yawpitchcontrol_cursor == 0)
 		{
-			int newVal = 1 - cl_headtracking.integer;
-			Cvar_SetValueQuick (&cl_headtracking, newVal);
+			headtracking = !headtracking;
 		}
 		else if (yawpitchcontrol_cursor == 1)
 		{
@@ -3069,7 +3145,7 @@ static void M_Menu_YawPitchControl_Draw (void)
 	visible = (int)((menu_height - 32) / 8);
 	opty = 32 - bound(0, optcursor - (visible >> 1), max(0, YAWCONTROL_ITEMS - visible)) * 8;
 
-	if (cl_headtracking.integer == 0)
+	if (!headtracking)
 		M_Options_PrintCommand(" Sensor Headtracking:  Disabled", true);
 	else
 		M_Options_PrintCommand(" Sensor Headtracking:  Enabled", true);

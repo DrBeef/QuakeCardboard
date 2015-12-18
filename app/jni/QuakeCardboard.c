@@ -27,8 +27,8 @@ extern int main (int argc, char **argv);
 
 extern qboolean vrMode;
 extern int bigScreen;
+extern int gameAssetsDownloadStatus;
 
-extern cvar_t cl_headtracking;
 extern cvar_t cl_centreoffset;
 
 static JavaVM *jVM;
@@ -128,7 +128,7 @@ void jni_SwitchVRMode()
 {
 	//Force headtracking on / off depending on whether we are using VR mode
 	//user must then change to their preference
-	Cvar_SetValueQuick (&cl_headtracking, vrMode ? 1 : 0);
+	headtracking = vrMode;
 
 	JNIEnv *env;
 	jobject tmp;
@@ -336,7 +336,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onNewFrame( JN
 	QC_MotionEvent(delta, last_joystick_x, last_joystick_y);
 
 	//Save orientation
-	if (cl_headtracking.integer == 1)
+	if (headtracking)
 	{
 		hmdorientation[YAW] =	yaw;
 		hmdorientation[PITCH] =	pitch;
@@ -440,4 +440,9 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setCallbackObj
 JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_requestAudioData(JNIEnv *env, jclass c, jlong handle)
 {
 	QC_GetAudio();
+}
+
+JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setDownloadStatus( JNIEnv * env, jobject obj, int status )
+{
+	gameAssetsDownloadStatus = status;
 }

@@ -153,6 +153,8 @@ public class MainActivity
 
     private String sdcard = Environment.getExternalStorageDirectory().getPath();
 
+    private DownloadTask mDownloadTask = null;
+
     public static boolean mQuakeInitialised = false;
     public static boolean mVRModeChanged = true;
     //Can't rebuild eye buffers until surface changed flag recorded
@@ -288,6 +290,14 @@ public class MainActivity
 
         //At the very least ensure we have a directory containing a config file
         copy_asset("config.cfg");
+
+        File f = new File(sdcard + "/Q4C/id1/pak0.pak");
+        if (!f.exists()) {
+            //If we don't have the pak file, then attempt to download
+            mDownloadTask = new DownloadTask();
+            mDownloadTask.set_context(MainActivity.this);
+            mDownloadTask.execute();
+        }
 
         //Create the FBOs
         fbo = new QuakeFBO();

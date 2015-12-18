@@ -1496,7 +1496,7 @@ extern cvar_t cl_yawspeed;
 extern cvar_t cl_pitchspeed;
 extern cvar_t cl_yawmult;
 extern cvar_t cl_pitchmult;
-extern cvar_t cl_headtracking;
+extern qboolean headtracking;
 
 extern cvar_t cl_anglespeedkey;
 
