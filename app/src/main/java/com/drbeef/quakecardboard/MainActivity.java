@@ -1,6 +1,8 @@
 package com.drbeef.quakecardboard;
 
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.ActivityInfo;
 import android.content.res.AssetManager;
 import android.opengl.GLES11Ext;
@@ -293,10 +295,32 @@ public class MainActivity
 
         File f = new File(sdcard + "/Q4C/id1/pak0.pak");
         if (!f.exists()) {
-            //If we don't have the pak file, then attempt to download
-            mDownloadTask = new DownloadTask();
-            mDownloadTask.set_context(MainActivity.this);
-            mDownloadTask.execute();
+            AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(
+                    this);
+
+            // set title
+            alertDialogBuilder.setTitle("No game assets found");
+
+            // set dialog message
+            alertDialogBuilder
+                    .setMessage("Would you like to download the shareware version of Quake (8MB)?\n\nIf you own or purchase the full game (On Steam: http://store.steampowered.com/app/2310/) you can click \'Cancel\' and copy the pak files to the folder:\n\n{phonememory}/Q4C/id1")
+                    .setCancelable(false)
+                    .setPositiveButton("Download",new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog,int id) {
+                            MainActivity.this.startDownload();
+                        }
+                    })
+                    .setNegativeButton("Cancel",new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog,int id) {
+                            dialog.cancel();
+                        }
+                    });
+
+            // create alert dialog
+            AlertDialog alertDialog = alertDialogBuilder.create();
+
+            // show it
+            alertDialog.show();
         }
 
         //Create the FBOs
@@ -308,7 +332,6 @@ public class MainActivity
         }
 
         QuakeJNILib.setCallbackObjects(mAudio, this);
-
 
         //See if user is trying to use command line params
         if(new File(sdcard + "/Q4C/commandline.txt").exists())
@@ -331,6 +354,13 @@ public class MainActivity
                 e.printStackTrace();
             }
         }
+    }
+
+    public void startDownload()
+    {
+        mDownloadTask = new DownloadTask();
+        mDownloadTask.set_context(MainActivity.this);
+        mDownloadTask.execute();
     }
 
     @Override
