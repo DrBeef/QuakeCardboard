@@ -148,7 +148,19 @@ for a few moments
 */
 void SCR_CenterPrint(const char *str)
 {
-	strlcpy (scr_centerstring, str, sizeof (scr_centerstring));
+	//Check to see if this is the shareware message, if so, replace with a more up to date
+	//relevant one
+	if (strstr(str, "1-800"))
+	{
+		char tempstr[] = "This episode isn't availble in the Shareware version\n"
+			"You can buy the full game of Quake for $10 on Steam:\n"
+				"http://store.steampowered.com/app/2310/";
+		strlcpy(scr_centerstring, tempstr, sizeof(scr_centerstring));
+	}
+	else {
+		strlcpy(scr_centerstring, str, sizeof(scr_centerstring));
+	}
+
 	scr_centertime_off = scr_centertime.value;
 	scr_centertime_start = cl.time;
 
