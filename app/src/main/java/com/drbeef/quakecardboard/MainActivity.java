@@ -277,7 +277,8 @@ public class MainActivity
 
         setContentView(R.layout.activity_main);
         cardboardView = (CardboardView) findViewById(R.id.cardboard_view);
-        cardboardView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
+        //cardboardView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
+        cardboardView.setEGLConfigChooser(5, 6, 5, 0, 16, 0);
         cardboardView.setRenderer(this);
         setCardboardView(cardboardView);
 
@@ -615,6 +616,8 @@ public class MainActivity
         Log.i(TAG, "onCardboardTrigger");
 
         QuakeJNILib.onKeyEvent(K_ENTER, KeyEvent.ACTION_DOWN, 0);
+
+        cardboardView.resetHeadTracker();
 
         // Always give user feedback.
         vibrator.vibrate(50);

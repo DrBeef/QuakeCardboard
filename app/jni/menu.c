@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mprogdefs.h"
 
-#define QC_VERSION  "1.5.3"
+#define QC_VERSION  "1.5.4"
 
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
@@ -3091,7 +3091,7 @@ static void M_Menu_YawPitchControl_Key (int key, int ascii)
 		{
 			int newYawMode = cl_yawmode.integer;
 			if (--newYawMode < 0)
-				newYawMode = 2;
+				newYawMode = 3;
 
 			Cvar_SetValueQuick (&cl_yawmode, newYawMode);
 		}
@@ -3115,7 +3115,7 @@ static void M_Menu_YawPitchControl_Key (int key, int ascii)
 		else if (yawpitchcontrol_cursor == 2)
 		{
 			int newYawMode = cl_yawmode.integer;
-			if (++newYawMode > 2)
+			if (++newYawMode > 3)
 				newYawMode = 0;
 
 			Cvar_SetValueQuick (&cl_yawmode, newYawMode);
@@ -3161,16 +3161,18 @@ static void M_Menu_YawPitchControl_Draw (void)
 		M_Options_PrintCommand("   Yaw Mode:           Swivel-Chair", true);
 	else if (cl_yawmode.integer == 1)
 		M_Options_PrintCommand("   Yaw Mode:           Comfort-Mode", true);
-	else
+	else if (cl_yawmode.integer == 2)
 		M_Options_PrintCommand("   Yaw Mode:           Stick-Yaw", true);
+	else
+		M_Options_PrintCommand("   Yaw Mode:           Look-To-Turn", true);
 
 	M_Options_PrintSlider(  "Comfort Mode Turn Angle", cl_yawmode.integer == 1, cl_comfort.value, 30, 180);
 	M_Options_PrintSlider(  "   Stick Yaw Turn Speed", cl_yawmode.integer == 2, sensitivity.value, 1, 10);
-	if (cl_yawmode.integer == 2)
+	if (cl_yawmode.integer >= 2)
 	{
 		M_Options_PrintCommand(" ", true);
 		M_Options_PrintCommand(" ", true);
-		M_Options_PrintCommand("WARNING: Yaw controlled by stick", true);
+		M_Options_PrintCommand("WARNING: Yaw rotation", true);
 		M_Options_PrintCommand("can induce severe nausea in ", true);
 		M_Options_PrintCommand("those not used to it.", true);
 		M_Options_PrintCommand(" ", true);
