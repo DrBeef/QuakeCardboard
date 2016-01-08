@@ -124,16 +124,16 @@ void jni_SwitchStereoMode(int mode)
 	(*env)->CallVoidMethod(env, quakeCallbackObj, android_SwitchStereoMode, mode);
 }
 
-void jni_SwitchVRMode()
+void jni_SwitchVRMode(int mode)
 {
 	//Force headtracking on / off depending on whether we are using VR mode
 	//user must then change to their preference
-	headtracking = vrMode;
+	headtracking = vrMode > 0;
 
 	JNIEnv *env;
 	jobject tmp;
 	(*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4);
-	(*env)->CallVoidMethod(env, quakeCallbackObj, android_SwitchVRMode);
+	(*env)->CallVoidMethod(env, quakeCallbackObj, android_SwitchVRMode, mode);
 }
 
 void jni_setEyeBufferResolution(int resolution)
@@ -371,9 +371,9 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onFinishFrame(
 	QC_EndFrame();
 }
 
-JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onSwitchVRMode( JNIEnv * env, jobject obj )
+JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onSwitchVRMode( JNIEnv * env, jobject obj, int mode )
 {
-	vrMode = !vrMode;
+	vrMode = mode;
 }
 
 JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onBigScreenMode( JNIEnv * env, jobject obj, int mode )
@@ -431,7 +431,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setCallbackObj
 	quakeCallbackClass = (*env)->GetObjectClass(env, quakeCallbackObj);
 
 	android_BigScreenMode = (*env)->GetMethodID(env,quakeCallbackClass,"BigScreenMode","(I)V");
-	android_SwitchVRMode = (*env)->GetMethodID(env,quakeCallbackClass,"SwitchVRMode","()V");
+	android_SwitchVRMode = (*env)->GetMethodID(env,quakeCallbackClass,"SwitchVRMode","(I)V");
 	android_SwitchStereoMode = (*env)->GetMethodID(env,quakeCallbackClass,"SwitchStereoMode","(I)V");
 	android_SetEyeBufferResolution = (*env)->GetMethodID(env,quakeCallbackClass,"SetEyeBufferResolution","(I)V");
 	android_Exit = (*env)->GetMethodID(env,quakeCallbackClass,"Exit","()V");

@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mprogdefs.h"
 
-#define QC_VERSION  "1.5.4"
+#define QC_VERSION  "1.6.0"
 
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
@@ -39,7 +39,7 @@ static const char* sNo = "No";
 static const char* sYes = "Yes";
 
 //Game always starts in vr mode, showing the menu on the big screen in stereo
-qboolean vrMode = true;
+int vrMode = 2;
 int bigScreen = 1;
 int stereoMode = 1;
 
@@ -53,7 +53,7 @@ extern char *strGameFolder;
 extern cvar_t r_worldscale;
 
 extern void jni_setEyeBufferResolution(int resolution);
-extern void jni_SwitchVRMode();
+extern void jni_SwitchVRMode(int mode);
 extern void jni_BigScreenMode(int mode);
 extern void jni_SwitchStereoMode(int mode);
 
@@ -494,9 +494,9 @@ static void M_Main_Draw (void)
 	if (m_missingdata)
 	{
 		//If we are in VR mode, switch out of it
-		if (vrMode) {
-			vrMode = false;
-			jni_SwitchVRMode();
+		if (vrMode > 0) {
+			vrMode = 0;
+			jni_SwitchVRMode(0);
 			showfps.integer = 0;
 		}
 
@@ -612,8 +612,11 @@ static void M_Main_Draw (void)
 	p = Draw_CachePic ("gfx/ttl_main");
 	M_DrawPic ( (320-p->width)/2, 4, "gfx/ttl_main");
 
-	M_DrawTextBox(72, 30, 20, 1);
-	M_Print(86, 38, va(vabuf, sizeof(vabuf), "Switch %s VR Mode", vrMode ? "Off" : "On"));
+	M_DrawTextBox(72, 30, 28, 1);
+	char *mode = "Off";
+	if (vrMode == 1) mode = "Side-by-Side";
+	if (vrMode == 2) mode = "Cardboard";
+	M_Print(86, 38, va(vabuf, sizeof(vabuf), "VR Mode: %s", mode));
 
 
 // Nehahra
@@ -833,8 +836,8 @@ static void M_Main_Key (int key, int ascii)
 			switch (m_main_cursor)
 			{
 			case 0:
-				vrMode = !vrMode;
-				jni_SwitchVRMode();
+				vrMode = (vrMode + 1) % 3;
+				jni_SwitchVRMode(vrMode);
 				break;
 
 			case 1:
@@ -1747,7 +1750,7 @@ static void M_Menu_Options_AdjustSliders (int dir)
 	else if (options_cursor == optnum++) ;
 	else if (options_cursor == optnum++)
 		 {
-			 if (vrMode) {
+			 if (vrMode == 2) {
 				 if (dir == 1) {
 					 andrw *= 2;
 					 if (andrw > 2048)
@@ -1879,7 +1882,7 @@ static void M_Options_Draw (void)
 	M_Options_PrintCommand( "   Controller Settings", true);
 	M_Options_PrintCommand( "    Open Quake Console", true);
 	M_Options_PrintCommand( "     Reset to defaults", true);
-	if (vrMode)
+	if (vrMode == 2)
 		M_Options_PrintSlider(  " Eye Buffer Resolution", true, andrw, 256, 2048);
 	else
 		M_Options_PrintCommand( " Eye Buffer Resolution     n/a", false);

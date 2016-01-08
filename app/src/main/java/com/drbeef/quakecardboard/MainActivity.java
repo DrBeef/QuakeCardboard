@@ -159,8 +159,14 @@ public class MainActivity
 
     public static boolean mQuakeInitialised = false;
     public static boolean mVRModeChanged = true;
+    public static int mVRMode = 2;
+    public static boolean sideBySide = false;
     //Can't rebuild eye buffers until surface changed flag recorded
     public static boolean mSurfaceChanged = false;
+
+    private int VRMODE_OFF = 0;
+    private int VRMODE_SIDEBYSIDE = 1;
+    private int VRMODE_CARDBOARD = 2;
 
     static {
         try {
@@ -270,15 +276,12 @@ public class MainActivity
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
 
-        if (Build.VERSION.SDK_INT>=9)
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
         cardboardView = (CardboardView) findViewById(R.id.cardboard_view);
-        //cardboardView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
-        cardboardView.setEGLConfigChooser(5, 6, 5, 0, 16, 0);
+        cardboardView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
         cardboardView.setRenderer(this);
         setCardboardView(cardboardView);
 
@@ -469,12 +472,16 @@ public class MainActivity
             if (fbo.FrameBuffer[0] != 0)
                 DestroyFBO(fbo);
 
-            if (cardboardView.getVRMode()) {
+            if (mVRMode == VRMODE_SIDEBYSIDE) {
+                CreateFBO(fbo, 0, eye.getViewport().width / 2, eye.getViewport().height);
+                QuakeJNILib.setResolution(eye.getViewport().width / 2, eye.getViewport().height);
+            }
+            else if (mVRMode == VRMODE_CARDBOARD) {
                 fboEyeResolution = getDesiredfboEyeResolution(eye.getViewport().width);
                 CreateFBO(fbo, 0, fboEyeResolution, fboEyeResolution);
                 QuakeJNILib.setResolution(fboEyeResolution, fboEyeResolution);
             }
-            else
+            else // VRMODE_OFF
             {
                 CreateFBO(fbo, 0, eye.getViewport().width, eye.getViewport().height);
                 QuakeJNILib.setResolution(eye.getViewport().width, eye.getViewport().height);
@@ -500,104 +507,133 @@ public class MainActivity
             //Record the curent fbo
             GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, currentFBO, 0);
 
-            //Stereo Mode logic
-            //Stereo = Draw current eye
-            //Mono  = Draw only left eye
-            if (mStereoMode == STEREO ||
-                    (mStereoMode == MONO && eye.getType() < 2))
-            {
-                //Bind our special fbo
-                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
-                GLES20.glEnable(GLES20.GL_DEPTH_TEST);
-                GLES20.glDepthFunc(GLES20.GL_LEQUAL);
-                GLES20.glEnable(GLES20.GL_SCISSOR_TEST);
+            for (int i = 0; i < 2; ++i) {
+                //Stereo Mode logic
+                //Stereo = Draw current eye
+                //Mono  = Draw only left eye
+                if (mStereoMode == STEREO ||
+                        (mStereoMode == MONO && eye.getType() < 2)) {
+                    //Bind our special fbo
+                    GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.FrameBuffer[0]);
+                    GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+                    GLES20.glDepthFunc(GLES20.GL_LEQUAL);
+                    GLES20.glEnable(GLES20.GL_SCISSOR_TEST);
 
-                if (cardboardView.getVRMode()) {
-                    GLES20.glScissor(0, 0, fboEyeResolution, fboEyeResolution);
-                } else {
-                    GLES20.glScissor(0, 0, eye.getViewport().width, eye.getViewport().height);
+                    if (mVRMode == VRMODE_SIDEBYSIDE) {
+                        GLES20.glScissor(0, 0, eye.getViewport().width / 2, eye.getViewport().height);
+                    } else if (mVRMode == VRMODE_CARDBOARD) {
+                        GLES20.glScissor(0, 0, fboEyeResolution, fboEyeResolution);
+                    } else {
+                        GLES20.glScissor(0, 0, eye.getViewport().width, eye.getViewport().height);
+                    }
+
+                    GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+                    GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+
+                    //Decide which eye we are drawing
+                    if (mStereoMode == MONO)
+                        eyeID = 0;
+                    else if (mVRMode == 0)
+                        eyeID = 0;
+                    else if (mVRMode == VRMODE_SIDEBYSIDE)
+                        eyeID = i;
+                    else // mStereoMode == StereoMode.STEREO  -  Default behaviour for VR mode
+                        eyeID = eye.getType() - 1;
+
+                    //Hopefully type indicates 0 = mono, 1 = left, 2 = right
+                    QuakeJNILib.onDrawEye(eyeID, 0, 0);
+
+                    //Finished rendering to our frame buffer, now draw this to the target framebuffer
+                    GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, currentFBO[0]);
                 }
 
-                GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-                GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+                GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
 
-                //Decide which eye we are drawing
-                if (mStereoMode == MONO)
-                    eyeID = 0;
-                else if (!cardboardView.getVRMode())
-                    eyeID = 0;
-                else // mStereoMode == StereoMode.STEREO  -  Default behaviour for VR mode
-                    eyeID = eye.getType() - 1;
+                if (mVRMode == VRMODE_SIDEBYSIDE) {
+                    GLES20.glViewport(eye.getViewport().x + ((eye.getViewport().width/2) * i),
+                        eye.getViewport().y,
+                        eye.getViewport().width/2,
+                        eye.getViewport().height);
+                }
+                else
+                {
+                    GLES20.glViewport(eye.getViewport().x,
+                            eye.getViewport().y,
+                            eye.getViewport().width,
+                            eye.getViewport().height);
+                }
 
-                //Hopefully type indicates 0 = mono, 1 = left, 2 = right
-                QuakeJNILib.onDrawEye(eyeID, 0, 0);
+                GLES20.glUseProgram(sp_Image);
 
-                //Finished rendering to our frame buffer, now draw this to the target framebuffer
-                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, currentFBO[0]);
+                if ((bigScreen != 0) && mVRMode > 0) {
+                    // Apply the eye transformation to the camera.
+                    Matrix.multiplyMM(view, 0, eye.getEyeView(), 0, camera, 0);
+
+                    // Build the ModelView and ModelViewProjection matrices
+                    // for calculating screen position.
+                    float[] perspective = eye.getPerspective(0.1f, 100.0f);
+                    Matrix.multiplyMM(modelView, 0, view, 0, modelScreen, 0);
+                    Matrix.multiplyMM(modelViewProjection, 0, perspective, 0, modelView, 0);
+
+                    // Set the position of the screen
+                    GLES20.glVertexAttribPointer(positionParam, 3, GLES20.GL_FLOAT, false, 0, screenVertices);
+
+                } else {
+
+                    // Create the triangles for orthographic projection (if required)
+                    int offset = QuakeJNILib.getCentreOffset();
+                    if (eye.getType() == 1 || i == 1)
+                        offset *= -1;
+
+                    int w = (int) (0.95 * eye.getViewport().width);
+                    int h = (int) (0.95 * eye.getViewport().height);
+                    int x = (int) (0.05 * eye.getViewport().width);
+                    int y = (int) (0.05 * eye.getViewport().height);
+                    if (mVRMode == VRMODE_SIDEBYSIDE) {
+                        //We have already halved the viewport
+                        w = (int) (eye.getViewport().width);
+                        h = (int) (eye.getViewport().height);
+                        x = 0;
+                        y = 0;
+                    }
+                    SetupTriangle(offset + x, y, w, h);
+
+                    // Calculate the projection and view transformation
+                    Matrix.orthoM(view, 0, 0, eye.getViewport().width, 0, eye.getViewport().height, 0, 50);
+                    Matrix.multiplyMM(modelViewProjection, 0, view, 0, camera, 0);
+
+                    // Prepare the triangle coordinate data
+                    GLES20.glVertexAttribPointer(positionParam, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer);
+                }
+
+                // Prepare the texturecoordinates
+                GLES20.glVertexAttribPointer(texCoordParam, 2, GLES20.GL_FLOAT, false, 0, uvBuffer);
+
+                // Apply the projection and view transformation
+                GLES20.glUniformMatrix4fv(modelViewProjectionParam, 1, false, modelViewProjection, 0);
+
+                // Bind texture to fbo's color texture
+                GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fbo.ColorTexture[0]);
+
+                // Set the sa8888mpler texture unit to our fbo's color texture
+                GLES20.glUniform1i(samplerParam, 0);
+
+                // Draw the triangles
+                GLES20.glDrawElements(GLES20.GL_TRIANGLES, indices.length,
+                        GLES20.GL_UNSIGNED_SHORT, drawListBuffer);
+
+                int error = GLES20.glGetError();
+                if (error != GLES20.GL_NO_ERROR)
+                    Log.d(TAG, "GLES20 Error = " + error);
+
+                // Disable vertex array
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+
+                //Only loop round again for side by side
+                if (mVRMode != VRMODE_SIDEBYSIDE && i == 0)
+                    break;
             }
-
-            GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
-            GLES20.glViewport(eye.getViewport().x, eye.getViewport().y, eye.getViewport().width, eye.getViewport().height);
-
-            GLES20.glUseProgram(sp_Image);
-
-            if ((bigScreen != 0) && cardboardView.getVRMode()) {
-                // Apply the eye transformation to the camera.
-                Matrix.multiplyMM(view, 0, eye.getEyeView(), 0, camera, 0);
-
-                // Build the ModelView and ModelViewProjection matrices
-                // for calculating screen position.
-                float[] perspective = eye.getPerspective(0.1f, 100.0f);
-                Matrix.multiplyMM(modelView, 0, view, 0, modelScreen, 0);
-                Matrix.multiplyMM(modelViewProjection, 0, perspective, 0, modelView, 0);
-
-                // Set the position of the screen
-                GLES20.glVertexAttribPointer(positionParam, 3, GLES20.GL_FLOAT, false, 0, screenVertices);
-
-            } else {
-
-                // Create the triangles for orthographic projection (if required)
-                int offset = QuakeJNILib.getCentreOffset();
-                if (eye.getType() == 1)
-                    offset *= -1;
-
-                int w = (int)(0.9 * eye.getViewport().width);
-                int h = (int)(0.9 * eye.getViewport().height);
-                int x = (int)(0.05 * eye.getViewport().width);
-                int y = (int)(0.05 * eye.getViewport().height);
-                SetupTriangle(offset + x, y, w, h);
-
-                // Calculate the projection and view transformation
-                Matrix.orthoM(view, 0, 0, eye.getViewport().width, 0, eye.getViewport().height, 0, 50);
-                Matrix.multiplyMM(modelViewProjection, 0, view, 0, camera, 0);
-
-                // Prepare the triangle coordinate data
-                GLES20.glVertexAttribPointer(positionParam, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer);
-            }
-
-            // Prepare the texturecoordinates
-            GLES20.glVertexAttribPointer(texCoordParam, 2, GLES20.GL_FLOAT, false, 0, uvBuffer);
-
-            // Apply the projection and view transformation
-            GLES20.glUniformMatrix4fv(modelViewProjectionParam, 1, false, modelViewProjection, 0);
-
-            // Bind texture to fbo's color texture
-            GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fbo.ColorTexture[0]);
-
-            // Set the sampler texture unit to our fbo's color texture
-            GLES20.glUniform1i(samplerParam, 0);
-
-            // Draw the triangles
-            GLES20.glDrawElements(GLES20.GL_TRIANGLES, indices.length,
-                    GLES20.GL_UNSIGNED_SHORT, drawListBuffer);
-
-            int error = GLES20.glGetError();
-            if (error != GLES20.GL_NO_ERROR)
-                Log.d(TAG, "GLES20 Error = " + error);
-
-            // Disable vertex array
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
         }
     }
 
@@ -668,7 +704,7 @@ public class MainActivity
                 startButtonDownCounter = -1;
                 SwitchVRMode();
                 //Now make sure quake is aware!
-                QuakeJNILib.onSwitchVRMode();
+                QuakeJNILib.onSwitchVRMode(mVRMode);
             }
         }
 
@@ -978,11 +1014,30 @@ public class MainActivity
         vertexBuffer.position(0);
     }
 
-    @Override
     public void SwitchVRMode() {
-        cardboardView.setVRModeEnabled(!cardboardView.getVRMode());
+        mVRMode = (mVRMode + 1) % 3;
+        SwitchVRMode(mVRMode);
+    }
+
+    @Override
+    public void SwitchVRMode(int vrMode) {
+        mVRMode = vrMode;
+        if (mVRMode == 0) {
+            cardboardView.setVRModeEnabled(false);
+            mSurfaceChanged = false;
+            sideBySide = false;
+        }
+        if (mVRMode == 1) {
+            cardboardView.setVRModeEnabled(false);
+            mSurfaceChanged = true;
+            sideBySide = true;
+        }
+        if (mVRMode == 2) {
+            cardboardView.setVRModeEnabled(true);
+            mSurfaceChanged = false;
+            sideBySide = false;
+        }
         mVRModeChanged = true;
-        mSurfaceChanged = false;
     }
 
     @Override
