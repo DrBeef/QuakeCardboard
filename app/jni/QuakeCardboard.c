@@ -29,7 +29,7 @@ extern qboolean vrMode;
 extern int bigScreen;
 extern int gameAssetsDownloadStatus;
 
-extern cvar_t cl_centreoffset;
+extern cvar_t cl_autocentreoffset;
 
 static JavaVM *jVM;
 static jobject audioBuffer=0;
@@ -383,7 +383,14 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onBigScreenMod
 
 JNIEXPORT int JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_getCentreOffset( JNIEnv * env, jobject obj )
 {
-	return cl_centreoffset.integer;
+	return cl_autocentreoffset.integer;
+}
+
+JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setCentreOffset( JNIEnv * env, jobject obj, int offset )
+{
+	//This is called only by the calculator, so only set it if it is not already set (i.e. by user or a previous run)
+	if (cl_autocentreoffset.integer == 0)
+		Cvar_SetValueQuick (&cl_autocentreoffset, offset);
 }
 
 JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_onKeyEvent( JNIEnv * env, jobject obj, int keyCode, int action, int character )

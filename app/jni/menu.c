@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mprogdefs.h"
 
-#define QC_VERSION  "1.6.0"
+#define QC_VERSION  "1.7.0"
 
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
@@ -309,7 +309,7 @@ static void M_DrawTextBox(float x, float y, float width, float height)
 //int m_save_demonum;
 
 extern cvar_t cl_nosplashscreen;
-extern cvar_t cl_centreoffset;
+extern cvar_t cl_autocentreoffset;
 
 /*
 ================
@@ -2222,7 +2222,7 @@ static void M_Menu_Options_Graphics_AdjustSliders (int dir)
 
 	optnum = 0;
 
-	if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&cl_centreoffset, bound(-150, cl_centreoffset.integer + dir * 5, 150));
+	if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&cl_autocentreoffset, bound(-200, cl_autocentreoffset.integer + dir * 5, 200));
 	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_coronas, bound(0, r_coronas.value + dir * 0.125, 4));
 	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&gl_flashblend, !gl_flashblend.integer);
 	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_gloss,							bound(0, r_shadow_gloss.integer + dir, 2));
@@ -2260,7 +2260,7 @@ static void M_Options_Graphics_Draw (void)
 	visible = (int)((menu_height - 32) / 8);
 	opty = 32 - bound(0, optcursor - (visible >> 1), max(0, OPTIONS_GRAPHICS_ITEMS - visible)) * 8;
 
-	M_Options_PrintSlider(  "    Lens Centre Offset", true, cl_centreoffset.integer, -150, 150);
+	M_Options_PrintSlider(  "    Lens Centre Offset", true, cl_autocentreoffset.integer, -200, 200);
 	M_Options_PrintSlider(  "      Corona Intensity", true, r_coronas.value, 0, 4);
 	M_Options_PrintCheckbox("      Use Only Coronas", true, gl_flashblend.integer);
 	M_Options_PrintSlider(  "            Gloss Mode", true, r_shadow_gloss.integer, 0, 2);

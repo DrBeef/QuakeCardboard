@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.pm.ActivityInfo;
 import android.content.res.AssetManager;
+import android.graphics.Point;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.opengl.Matrix;
@@ -12,7 +13,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Vibrator;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Display;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.InputDevice;
@@ -20,9 +23,13 @@ import android.view.Window;
 import android.view.WindowManager;
 
 import com.google.vrtoolkit.cardboard.CardboardActivity;
+import com.google.vrtoolkit.cardboard.CardboardDeviceParams;
 import com.google.vrtoolkit.cardboard.CardboardView;
+import com.google.vrtoolkit.cardboard.Distortion;
 import com.google.vrtoolkit.cardboard.Eye;
+import com.google.vrtoolkit.cardboard.HeadMountedDisplay;
 import com.google.vrtoolkit.cardboard.HeadTransform;
+import com.google.vrtoolkit.cardboard.ScreenParams;
 import com.google.vrtoolkit.cardboard.Viewport;
 
 import java.io.BufferedReader;
@@ -37,6 +44,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 
 import javax.microedition.khronos.egl.EGLConfig;
@@ -281,10 +289,10 @@ public class MainActivity
 
         setContentView(R.layout.activity_main);
         cardboardView = (CardboardView) findViewById(R.id.cardboard_view);
-        cardboardView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
+        cardboardView.setEGLConfigChooser(5, 6, 5, 0, 16, 0);
+        cardboardView.setLowLatencyModeEnabled(true);
         cardboardView.setRenderer(this);
         setCardboardView(cardboardView);
-
 
         modelScreen = new float[16];
         camera = new float[16];
@@ -499,6 +507,34 @@ public class MainActivity
             //Reset our orientation
             cardboardView.resetHeadTracker();
 
+
+            //Now calculate the auto lens centre correction
+            CardboardDeviceParams device = cardboardView.getHeadMountedDisplay().getCardboardDeviceParams();
+            ScreenParams scr = cardboardView.getScreenParams();
+            Display display = getWindowManager().getDefaultDisplay();
+            DisplayMetrics met = new DisplayMetrics();
+            display.getMetrics(met);
+            float dpmil = (met.xdpi / 25.4f);
+            float qscreen = (scr.getWidthMeters() * 1000.0f) / 4.0f;
+            float halflens = (device.getInterLensDistance() * 1000.0f) / 2.0f;
+            //Multiply by small fudge factor (20%)
+            float lensCentreOffset = ((halflens - qscreen) * dpmil) * 1.2f;
+
+            if (mVRMode == VRMODE_CARDBOARD) {
+                //Viewport size is not the same as screen resolution, so convert
+                lensCentreOffset = (lensCentreOffset / (scr.getWidth() / 2.0f)) * eye.getViewport().width;
+            }
+            else if (mVRMode == VRMODE_SIDEBYSIDE) {
+                //do nothing, no correction needed
+            }
+            else
+            {
+                //No offset required
+                lensCentreOffset = 0;
+            }
+
+            QuakeJNILib.setCentreOffset((int)lensCentreOffset);
+
             mQuakeInitialised = true;
         }
 
@@ -551,9 +587,9 @@ public class MainActivity
 
                 if (mVRMode == VRMODE_SIDEBYSIDE) {
                     GLES20.glViewport(eye.getViewport().x + ((eye.getViewport().width/2) * i),
-                        eye.getViewport().y,
-                        eye.getViewport().width/2,
-                        eye.getViewport().height);
+                            eye.getViewport().y,
+                            eye.getViewport().width/2,
+                            eye.getViewport().height);
                 }
                 else
                 {
@@ -585,17 +621,19 @@ public class MainActivity
                     if (eye.getType() == 1 || i == 1)
                         offset *= -1;
 
-                    int w = (int) (0.95 * eye.getViewport().width);
-                    int h = (int) (0.95 * eye.getViewport().height);
-                    int x = (int) (0.05 * eye.getViewport().width);
-                    int y = (int) (0.05 * eye.getViewport().height);
-                    if (mVRMode == VRMODE_SIDEBYSIDE) {
-                        //We have already halved the viewport
-                        w = (int) (eye.getViewport().width);
-                        h = (int) (eye.getViewport().height);
+                    int w = (int) eye.getViewport().width;
+                    int h = (int) eye.getViewport().height;
+                    int x = (int) 0;
+                    int y = (int) 0;
+                    if (mVRMode == VRMODE_CARDBOARD)
+                    {
+                        //This assumes that height > width for an eye
+                        w = (int) eye.getViewport().width;
+                        h = (int) eye.getViewport().width;
                         x = 0;
-                        y = 0;
+                        y = (eye.getViewport().height - eye.getViewport().width) / 2;
                     }
+
                     SetupTriangle(offset + x, y, w, h);
 
                     // Calculate the projection and view transformation
@@ -614,9 +652,11 @@ public class MainActivity
 
                 // Bind texture to fbo's color texture
                 GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+                IntBuffer activeTex0 = IntBuffer.allocate(2);
+                GLES20.glGetIntegerv(GLES20.GL_TEXTURE_BINDING_2D, activeTex0);
                 GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fbo.ColorTexture[0]);
 
-                // Set the sa8888mpler texture unit to our fbo's color texture
+                // Set the sampler texture unit to our fbo's color texture
                 GLES20.glUniform1i(samplerParam, 0);
 
                 // Draw the triangles
@@ -628,7 +668,7 @@ public class MainActivity
                     Log.d(TAG, "GLES20 Error = " + error);
 
                 // Disable vertex array
-                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, activeTex0.get(0));
 
                 //Only loop round again for side by side
                 if (mVRMode != VRMODE_SIDEBYSIDE && i == 0)
@@ -868,8 +908,10 @@ public class MainActivity
             case KeyEvent.KEYCODE_FOCUS:
                 return K_F1;
             case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_W:
                 return K_UPARROW;
             case KeyEvent.KEYCODE_DPAD_DOWN:
+            case KeyEvent.KEYCODE_S:
                 return K_DOWNARROW;
             case KeyEvent.KEYCODE_DPAD_LEFT:
                 return 'a';
@@ -881,6 +923,8 @@ public class MainActivity
                 return K_ENTER;
 			case KeyEvent.KEYCODE_BACK:
 				return K_ESCAPE;
+            case KeyEvent.KEYCODE_APOSTROPHE:
+                return K_ESCAPE;
             case KeyEvent.KEYCODE_DEL:
                 return K_BACKSPACE;
             case KeyEvent.KEYCODE_ALT_LEFT:
@@ -988,11 +1032,14 @@ public class MainActivity
 
         // Bind texture to texturename
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        IntBuffer activeTex0 = IntBuffer.allocate(2);
+        GLES20.glGetIntegerv(GLES20.GL_TEXTURE_BINDING_2D, activeTex0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texturenames[0]);
 
         // Set filtering
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, activeTex0.get(0));
     }
 
     public void SetupTriangle(int x, int y, int width, int height)
