@@ -28,7 +28,7 @@ int cl_available = true;
 static long oldtime=0;
 
 qboolean vid_supportrefreshrate = false;
-extern qboolean vrMode;
+extern int vrMode;
 
 
 void VID_Shutdown(void)
@@ -487,7 +487,7 @@ void QC_MotionEvent(float delta, float dx, float dy)
 	static bool canAdjust = true;
 
 	//Pitch lock?
-	if (cl_pitchmode.integer != 0 || !vrMode) {
+	if (cl_pitchmode.integer != 0 || vrMode == 0) {
 
 		float dir = 1.0f;
 		if (cl_pitchmode.integer == 1)

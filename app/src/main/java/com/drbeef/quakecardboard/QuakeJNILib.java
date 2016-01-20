@@ -18,6 +18,7 @@ public class QuakeJNILib {
     public static native int  getCentreOffset( );
     public static native void setCentreOffset( int offset );
     public static native void setDownloadStatus( int status );
+    public static native int  getEyeBufferResolution( );
 
     //Audio
     public static native void requestAudioData();

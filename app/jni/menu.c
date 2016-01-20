@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mprogdefs.h"
 
-#define QC_VERSION  "1.7.0"
+#define QC_VERSION  "1.7.1"
 
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
@@ -43,16 +43,17 @@ int vrMode = 2;
 int bigScreen = 1;
 int stereoMode = 1;
 
+extern int andrw;
+
 enum m_state_e m_state = m_main;
 char m_return_reason[128];
 
 extern vec3_t hmdorientation;
-extern int andrw;
 extern char *strGameFolder;
 
 extern cvar_t r_worldscale;
+extern cvar_t v_eyebufferresolution;
 
-extern void jni_setEyeBufferResolution(int resolution);
 extern void jni_SwitchVRMode(int mode);
 extern void jni_BigScreenMode(int mode);
 extern void jni_SwitchStereoMode(int mode);
@@ -1752,18 +1753,17 @@ static void M_Menu_Options_AdjustSliders (int dir)
 		 {
 			 if (vrMode == 2) {
 				 if (dir == 1) {
-					 andrw *= 2;
-					 if (andrw > 2048)
-						 andrw = 256;
+					 v_eyebufferresolution.integer *= 2;
+					 if (v_eyebufferresolution.integer > 2048)
+						 v_eyebufferresolution.integer = 256;
 				 }
 				 else {
-					 andrw /= 2;
-					 if (andrw < 256)
-						 andrw = 2048;
+					 v_eyebufferresolution.integer /= 2;
+					 if (v_eyebufferresolution.integer < 256)
+						 v_eyebufferresolution.integer = 2048;
 				 }
 
-				 //Push back up to Java
-				 jni_setEyeBufferResolution(andrw);
+				 Cvar_SetValueQuick(&v_eyebufferresolution, v_eyebufferresolution.integer);
 			 }
 		 }
 	else if (options_cursor == optnum++) ;
@@ -1882,8 +1882,12 @@ static void M_Options_Draw (void)
 	M_Options_PrintCommand( "   Controller Settings", true);
 	M_Options_PrintCommand( "    Open Quake Console", true);
 	M_Options_PrintCommand( "     Reset to defaults", true);
-	if (vrMode == 2)
-		M_Options_PrintSlider(  " Eye Buffer Resolution", true, andrw, 256, 2048);
+	if (vrMode == 2) {
+		if (v_eyebufferresolution.integer == 0)
+			v_eyebufferresolution.integer = andrw;
+		M_Options_PrintSlider(" Eye Buffer Resolution", true, v_eyebufferresolution.integer, 256,
+							  2048);
+	}
 	else
 		M_Options_PrintCommand( " Eye Buffer Resolution     n/a", false);
 	char buf[356];

@@ -83,6 +83,8 @@ public class MainActivity
 
     //-1 means start button isn't pressed
     private long startButtonDownCounter = -1;
+    //Don't allow the trigger to fire more than once per 200ms
+    private long triggerTimeout = 0;
 
     private Vibrator vibrator;
     private float M_PI = 3.14159265358979323846f;
@@ -446,7 +448,8 @@ public class MainActivity
 
     int getDesiredfboEyeResolution(int viewportWidth) {
 
-        if (desiredEyeBufferResolution != -1)
+        desiredEyeBufferResolution = QuakeJNILib.getEyeBufferResolution();
+        if (desiredEyeBufferResolution != 0)
             return desiredEyeBufferResolution;
 
         //Select based on viewport width
@@ -455,7 +458,6 @@ public class MainActivity
         else if (viewportWidth > 512)
             desiredEyeBufferResolution = 512;
         else
-            //don't want to go lower than this
             desiredEyeBufferResolution = 256;
 
         return desiredEyeBufferResolution;
@@ -466,6 +468,11 @@ public class MainActivity
         if (mQuakeInitialised) {
             headTransform.getEulerAngles(eulerAngles, 0);
             QuakeJNILib.onNewFrame(-eulerAngles[0] / (M_PI / 180.0f), eulerAngles[1] / (M_PI / 180.0f), -eulerAngles[2] / (M_PI / 180.0f));
+
+            //Check to see if we should update the eye buffer resolution
+            int checkRes = QuakeJNILib.getEyeBufferResolution();
+            if (checkRes != 0 && checkRes != desiredEyeBufferResolution)
+                mVRModeChanged = true;
         }
     }
 
@@ -691,12 +698,17 @@ public class MainActivity
     public void onCardboardTrigger() {
         Log.i(TAG, "onCardboardTrigger");
 
-        QuakeJNILib.onKeyEvent(K_ENTER, KeyEvent.ACTION_DOWN, 0);
+        if (System.currentTimeMillis() - triggerTimeout > 200) {
 
-        cardboardView.resetHeadTracker();
+            QuakeJNILib.onKeyEvent(K_ENTER, KeyEvent.ACTION_DOWN, 0);
 
-        // Always give user feedback.
-        vibrator.vibrate(50);
+            cardboardView.resetHeadTracker();
+
+            // Always give user feedback.
+            vibrator.vibrate(50);
+
+            triggerTimeout = System.currentTimeMillis();
+        }
     }
 
 
@@ -1088,16 +1100,13 @@ public class MainActivity
     }
 
     @Override
-    public void SetEyeBufferResolution(int newResolution) {
-        desiredEyeBufferResolution = newResolution;
-
-        //This will cause video reset
-        mVRModeChanged = true;
-    }
-
-    @Override
     public void Exit() {
         mAudio.terminateAudio();
+        try {
+            Thread.sleep(1000);
+        }
+        catch (InterruptedException ie){
+        }
         System.exit(0);
     }
 

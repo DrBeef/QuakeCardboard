@@ -33,6 +33,7 @@ when crossing a water boudnary.
 */
 
 cvar_t cl_autocentreoffset = {CVAR_SAVE, "cl_autocentreoffset", "0", "Additional lens offset (for difficult headets) from the centre to get images converging ok"};
+cvar_t v_eyebufferresolution = {CVAR_SAVE, "v_eyebufferresolution", "0", "Eye Buffer Resolution"};
 
 cvar_t cl_rollspeed = {0, "cl_rollspeed", "200", "how much strafing is necessary to tilt the view"};
 cvar_t cl_rollangle = {0, "cl_rollangle", "0.0", "how much to tilt the view when strafing"};
@@ -1082,6 +1083,7 @@ void V_Init (void)
 	Cvar_RegisterVariable (&crosshair);
 
 	Cvar_RegisterVariable (&cl_autocentreoffset);
+	Cvar_RegisterVariable (&v_eyebufferresolution);
 
 	Cvar_RegisterVariable (&cl_rollspeed);
 	Cvar_RegisterVariable (&cl_rollangle);

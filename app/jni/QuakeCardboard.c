@@ -30,6 +30,7 @@ extern int bigScreen;
 extern int gameAssetsDownloadStatus;
 
 extern cvar_t cl_autocentreoffset;
+extern cvar_t v_eyebufferresolution;
 
 static JavaVM *jVM;
 static jobject audioBuffer=0;
@@ -45,7 +46,6 @@ static jobject quakeCallbackObj=0;
 jmethodID android_BigScreenMode;
 jmethodID android_SwitchVRMode;
 jmethodID android_SwitchStereoMode;
-jmethodID android_SetEyeBufferResolution;
 jmethodID android_Exit;
 
 void jni_initAudio(void *buffer, int size)
@@ -134,17 +134,6 @@ void jni_SwitchVRMode(int mode)
 	jobject tmp;
 	(*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4);
 	(*env)->CallVoidMethod(env, quakeCallbackObj, android_SwitchVRMode, mode);
-}
-
-void jni_setEyeBufferResolution(int resolution)
-{
-	if (audioBuffer==0) return;
-	JNIEnv *env;
-	if (((*jVM)->GetEnv(jVM, (void**) &env, JNI_VERSION_1_4))<0)
-	{
-		(*jVM)->AttachCurrentThread(jVM,&env, NULL);
-	}
-	(*env)->CallVoidMethod(env, quakeCallbackObj, android_SetEyeBufferResolution, resolution);
 }
 
 void jni_Exit()
@@ -386,6 +375,12 @@ JNIEXPORT int JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_getCentreOffset
 	return cl_autocentreoffset.integer;
 }
 
+JNIEXPORT int JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_getEyeBufferResolution( JNIEnv * env, jobject obj )
+{
+	return v_eyebufferresolution.integer;
+}
+
+
 JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setCentreOffset( JNIEnv * env, jobject obj, int offset )
 {
 	//This is called only by the calculator, so only set it if it is not already set (i.e. by user or a previous run)
@@ -440,7 +435,6 @@ JNIEXPORT void JNICALL Java_com_drbeef_quakecardboard_QuakeJNILib_setCallbackObj
 	android_BigScreenMode = (*env)->GetMethodID(env,quakeCallbackClass,"BigScreenMode","(I)V");
 	android_SwitchVRMode = (*env)->GetMethodID(env,quakeCallbackClass,"SwitchVRMode","(I)V");
 	android_SwitchStereoMode = (*env)->GetMethodID(env,quakeCallbackClass,"SwitchStereoMode","(I)V");
-	android_SetEyeBufferResolution = (*env)->GetMethodID(env,quakeCallbackClass,"SetEyeBufferResolution","(I)V");
 	android_Exit = (*env)->GetMethodID(env,quakeCallbackClass,"Exit","()V");
 }
 
